@@ -1,0 +1,1086 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&display=swap');
+
+  :root {
+    --parchment: #f4e4c1;
+    --parchment-dark: #d4b896;
+    --wood-dark: #3e2723;
+    --wood-mid: #5d4037;
+    --wood-light: #795548;
+    --gold: #c9a94e;
+    --gold-light: #e6c96a;
+    --ink: #1a1008;
+    --ocean-deep: #1a3a4a;
+    --ocean: #1e4d5c;
+    --red-accent: #8b2500;
+    --brass: #b5a642;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: linear-gradient(135deg, #0d1b2a 0%, #1b3a4b 50%, #0d1b2a 100%);
+    min-height: 100vh;
+    font-family: 'IM Fell English', 'Georgia', 'Times New Roman', serif;
+    color: var(--ink);
+  }
+
+  .app-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  /* ── 主容器：仿古地图框 ── */
+  .main-container {
+    display: flex;
+    gap: 0;
+    background: linear-gradient(180deg, #5d4037 0%, #3e2723 30%, #4e342e 100%);
+    padding: 18px;
+    border-radius: 8px;
+    box-shadow:
+      inset 0 0 0 3px #2a1810,
+      inset 0 0 0 6px #5d4037,
+      inset 0 0 0 9px #2a1810,
+      0 12px 48px rgba(0,0,0,0.7),
+      0 0 80px rgba(180,140,60,0.08);
+    border: 4px solid #2a1810;
+    position: relative;
+  }
+
+  /* 四角铆钉装饰 */
+  .main-container::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+    pointer-events: none;
+    border: 2px solid var(--brass);
+    border-radius: 12px;
+    opacity: 0.25;
+  }
+
+  /* ── 左侧：棋盘区域 ── */
+  .board-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--parchment-dark);
+    padding: 14px 14px 10px;
+    border-radius: 4px;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+    border: 3px solid var(--wood-dark);
+  }
+
+  .board-label {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 22px;
+    letter-spacing: 4px;
+    color: var(--ink);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  .grid-labels-row {
+    display: flex;
+    gap: 0;
+    padding-left: 28px;
+    margin-bottom: 2px;
+  }
+  .grid-label {
+    width: 28px;
+    height: 14px;
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink);
+    opacity: 0.6;
+    font-weight: bold;
+    line-height: 14px;
+    user-select: none;
+  }
+
+  .grid-row-outer {
+    display: flex;
+    gap: 0;
+    align-items: center;
+  }
+  .row-label {
+    width: 16px;
+    height: 28px;
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink);
+    opacity: 0.6;
+    font-weight: bold;
+    line-height: 28px;
+    user-select: none;
+    margin: 0 4px;
+  }
+
+  canvas#gameCanvas {
+    display: block;
+    border: 4px solid var(--wood-dark);
+    border-radius: 2px;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.3), 0 0 12px rgba(0,0,0,0.4);
+    background: #d9c8a8;
+    cursor: crosshair;
+  }
+
+  /* ── 右侧：信息与控制面板 ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    width: 280px;
+    margin-left: 16px;
+    gap: 12px;
+  }
+
+  .panel-card {
+    background: linear-gradient(180deg, #efe0c4 0%, #e0cda0 100%);
+    border: 3px solid var(--wood-dark);
+    border-radius: 4px;
+    padding: 16px;
+    box-shadow: inset 0 0 12px rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.3);
+    position: relative;
+  }
+
+  .panel-card::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border: 1px solid rgba(139, 90, 40, 0.2);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .card-title {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    color: var(--red-accent);
+    border-bottom: 2px solid var(--parchment-dark);
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ── 状态信息 ── */
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dotted rgba(139, 90, 40, 0.25);
+  }
+  .info-item:last-child { border-bottom: none; }
+
+  .info-label {
+    font-size: 14px;
+    color: var(--wood-dark);
+    letter-spacing: 1px;
+  }
+  .info-value {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 16px;
+    color: var(--ink);
+    font-weight: bold;
+    min-width: 50px;
+    text-align: right;
+  }
+
+  /* ── 名船技能（纵向布局、小字号清晰字体） ── */
+  .skill-item {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+  .info-skill {
+    font-family: 'IM Fell English', 'Georgia', 'Times New Roman', serif;
+    font-size: 13px;
+    color: var(--wood-dark);
+    font-weight: normal;
+    line-height: 1.5;
+    text-align: left;
+    margin-top: 4px;
+    width: 100%;
+    opacity: 0.85;
+  }
+
+  .player-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+  }
+  .player-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    box-shadow: inset 0 0 4px rgba(0,0,0,0.3);
+  }
+
+  /* ── 行动按钮 ── */
+  .action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .btn-action {
+    position: relative;
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    color: var(--parchment);
+    background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+    border: 2px solid #2a1810;
+    border-radius: 4px;
+    padding: 10px 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    text-align: center;
+    transition: all 0.12s ease;
+    box-shadow: 0 3px 0 #1a1008, 0 4px 8px rgba(0,0,0,0.3);
+    user-select: none;
+  }
+
+  .btn-action:hover {
+    background: linear-gradient(180deg, #795548 0%, #5d4037 100%);
+    border-color: var(--gold);
+    color: var(--gold-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 0 #1a1008, 0 6px 12px rgba(0,0,0,0.4);
+  }
+
+  .btn-action:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #1a1008, 0 2px 4px rgba(0,0,0,0.3);
+    transition: all 0.04s ease;
+  }
+
+  .btn-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 2px 0 #1a1008, 0 2px 4px rgba(0,0,0,0.2);
+  }
+
+  .btn-action.full-width { grid-column: 1 / -1; }
+
+  .btn-action.move  { border-left: 3px solid #5ba0c0; }
+  .btn-action.turn  { border-left: 3px solid #d4a843; }
+  .btn-action.attack { border-left: 3px solid #c0392b; }
+
+  .hotkey-hint {
+    font-size: 10px;
+    opacity: 0.6;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  /* ── 回合控制 ── */
+  .turn-controls {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-turn {
+    flex: 1;
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.12s ease;
+    border: 2px solid;
+  }
+  .btn-end-turn {
+    background: linear-gradient(180deg, #8b2500 0%, #5c1800 100%);
+    color: var(--parchment);
+    border-color: #3a0f00;
+    box-shadow: 0 3px 0 #2a0800;
+  }
+  .btn-end-turn:hover {
+    background: linear-gradient(180deg, #a03010 0%, #7a2000 100%);
+    color: #fff;
+  }
+
+  .btn-reset {
+    background: linear-gradient(180deg, #555 0%, #333 100%);
+    color: #ccc;
+    border-color: #222;
+  }
+
+  .btn-music {
+    background: linear-gradient(180deg, #4a6d3b 0%, #2d4a1e 100%);
+    color: #c8d8b0;
+    border-color: #1a2e10;
+    font-size: 11px;
+    min-width: 56px;
+    flex: 0.6;
+  }
+  .btn-music:hover {
+    background: linear-gradient(180deg, #5a8a45 0%, #3d5e2a 100%);
+    color: #e0f0c0;
+  }
+  .btn-music.muted {
+    background: linear-gradient(180deg, #6b4a3b 0%, #4a2d1e 100%);
+    color: #c0a090;
+  }
+
+  /* ── 消息日志 ── */
+  .log-area {
+    flex: 1;
+    min-height: 100px;
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--ink);
+    opacity: 0.8;
+    font-style: italic;
+  }
+  .log-area .log-entry {
+    padding: 2px 0;
+    border-bottom: 1px dotted rgba(139,90,40,0.15);
+  }
+
+  /* 滚动条风格 */
+  .log-area::-webkit-scrollbar { width: 6px; }
+  .log-area::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 3px; }
+  .log-area::-webkit-scrollbar-thumb { background: var(--parchment-dark); border-radius: 3px; }
+
+  /* ═══ 移动端竖屏布局 ═══ */
+  @media (max-width: 900px) {
+    body { padding: 0; overflow-x: auto; overflow-y: auto; }
+    .app-wrapper { align-items: flex-start; }
+
+    .main-container {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 3px;
+      border-radius: 0;
+      border: none;
+      box-shadow: none;
+      width: 100%;
+      max-width: 100vw;
+    }
+    .main-container::before { display: none; }
+
+    /* 侧面板展平：子元素变为 main-container 的直接子元素 */
+    .side-panel {
+      display: contents;
+    }
+
+    /* 移动端排序：Ship's Log(1) → 棋盘(2) → Orders(3) → 回合控制(4) → 日志(5) */
+    .mobile-order-1 { order: 1; }
+    .mobile-order-2 { order: 2; }
+    .mobile-order-3 { order: 3; }
+    .mobile-order-4 { order: 4; }
+    .mobile-order-5 { order: 5; }
+
+    /* ── Ship's Log（顶部，极致紧凑） ── */
+    #infoCard {
+      margin-bottom: 3px;
+      padding: 4px 6px;
+    }
+    #infoCard .card-title { font-size: 11px; margin-bottom: 1px; padding-bottom: 1px; letter-spacing: 1px; }
+    #infoCard .info-item { padding: 0; border-bottom: none; flex-direction: row; }
+    #infoCard .info-label { font-size: 9px; letter-spacing: 0; }
+    #infoCard .info-value { font-size: 11px; min-width: auto; }
+    .player-indicator { margin: 1px 0; gap: 3px; }
+    .player-dot { width: 10px; height: 10px; }
+    #infoCard .skill-item { flex-direction: column !important; align-items: flex-start !important; margin-top: 1px; }
+    #infoCard .info-skill { font-size: 10px; line-height: 1.3; margin-top: 1px; }
+
+    /* ── 棋盘（中间） ── */
+    .board-wrapper {
+      width: 100%;
+      padding: 3px 4px;
+      margin-bottom: 3px;
+      overflow: visible;
+    }
+    .board-label { font-size: 12px; margin-bottom: 0; letter-spacing: 1px; }
+
+    canvas#gameCanvas {
+      display: block;
+    }
+
+    /* 网格标签由JS精确设置尺寸 */
+    .grid-labels-row { margin-bottom: 0; overflow: hidden; }
+    .grid-label { overflow: hidden; flex: 0 0 auto; }
+    .row-label { overflow: hidden; }
+    .grid-row-outer { gap: 0; }
+
+
+
+    /* ── Orders（棋盘下方） ── */
+    .panel-card.mobile-order-3 {
+      padding: 4px 6px;
+      margin-bottom: 3px;
+    }
+    .panel-card.mobile-order-3 .card-title { font-size: 11px; margin-bottom: 2px; padding-bottom: 1px; letter-spacing: 1px; }
+    .action-grid { gap: 3px; }
+    .btn-action { font-size: 9px; padding: 6px 2px; letter-spacing: 0; border-radius: 3px; }
+    .btn-action .hotkey-hint { display: none; }
+    .btn-action.special { font-size: 9px; }
+
+    /* ── 回合控制 ── */
+    .turn-controls.mobile-order-4 {
+      margin-bottom: 3px;
+      gap: 3px;
+    }
+    .btn-turn { font-size: 10px; padding: 7px 4px; letter-spacing: 0; }
+
+    /* ── Captain's Log（底部，滚动查看） ── */
+    .panel-card.mobile-order-5 {
+      padding: 4px 6px;
+      margin-bottom: 12px;
+    }
+    .panel-card.mobile-order-5 .card-title { font-size: 11px; margin-bottom: 2px; padding-bottom: 1px; letter-spacing: 1px; }
+    .log-area { max-height: 100px; min-height: 50px; font-size: 10px; line-height: 1.3; }
+
+    /* ── 遮罩界面适配 ── */
+    .menu-card { padding: 24px 20px; max-width: 94vw; }
+    .menu-title { font-size: 32px; }
+    .menu-item { padding: 12px 32px; font-size: 16px; }
+    .selection-card { padding: 16px 12px; max-width: 98vw; }
+    .selection-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; max-height: 360px; }
+    .selection-title { font-size: 20px; }
+    .ship-pick-card { padding: 8px 9px; }
+    .ship-pick-name { font-size: 13px; }
+    .ship-pick-price { font-size: 12px; }
+    .campaign-card, .library-card { padding: 16px 12px; max-width: 98vw; }
+    .campaign-grid, .library-grid { gap: 6px; }
+    .campaign-level { font-size: 12px; padding: 12px 6px; }
+    .victory-card { padding: 20px 20px; min-width: auto; max-width: 92vw; }
+    .victory-title { font-size: 26px; }
+    .unlock-card { max-width: 90vw; padding: 20px; }
+  }
+
+  /* ── 初始菜单 ── */
+  .menu-overlay {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(135deg, #0d1b2a 0%, #1b3a4b 50%, #0d1b2a 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+  .menu-overlay.hidden { display: none; }
+  .hidden { display: none !important; }
+
+  .menu-card {
+    text-align: center;
+    background: linear-gradient(180deg, #efe0c4 0%, #d4b896 100%);
+    padding: 48px 56px;
+    border: 4px solid #3e2723;
+    border-radius: 6px;
+    box-shadow:
+      inset 0 0 0 3px #5d4037,
+      inset 0 0 0 6px #3e2723,
+      0 16px 64px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .menu-card::after {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border: 1px solid rgba(139,90,40,0.2);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+
+  .menu-title {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 42px;
+    letter-spacing: 6px;
+    color: #1a1008;
+    margin-bottom: 4px;
+  }
+  .menu-subtitle {
+    font-family: 'IM Fell English', 'Georgia', serif;
+    font-size: 14px;
+    font-style: italic;
+    color: #5d4037;
+    letter-spacing: 3px;
+    margin-bottom: 36px;
+    opacity: 0.7;
+  }
+  .menu-divider {
+    width: 60%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #8b5a2b, transparent);
+    margin: 0 auto 32px;
+  }
+
+  .menu-items {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .menu-item {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--parchment);
+    background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+    border: 2px solid #2a1810;
+    border-radius: 4px;
+    padding: 14px 48px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s ease;
+    box-shadow: 0 3px 0 #1a1008, 0 4px 12px rgba(0,0,0,0.3);
+    user-select: none;
+  }
+  .menu-item:hover {
+    background: linear-gradient(180deg, #795548 0%, #5d4037 100%);
+    border-color: var(--gold);
+    color: var(--gold-light);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 0 #1a1008, 0 6px 16px rgba(0,0,0,0.4);
+  }
+  .menu-item:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #1a1008, 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .menu-item.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .menu-item.disabled:hover {
+    background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+    border-color: #2a1810;
+    color: var(--parchment);
+    transform: none;
+    box-shadow: 0 3px 0 #1a1008, 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .menu-item.selected {
+    border-color: var(--gold-light) !important;
+    color: var(--gold-light) !important;
+    background: linear-gradient(180deg, #6d4c41 0%, #4a3028 100%) !important;
+    box-shadow: 0 0 20px rgba(201,169,78,0.6), inset 0 0 8px rgba(201,169,78,0.15);
+    position: relative;
+  }
+  .menu-item.selected::after {
+    content: ' ◀';
+    position: absolute;
+    right: 14px;
+    color: var(--gold-light);
+  }
+  }
+
+  /* ── 胜利结算覆盖层 ── */
+  #victoryOverlay {
+    position: fixed !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important; height: 100% !important;
+    background: rgba(0,0,0,0.75);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.4s ease;
+  }
+  #victoryOverlay.hidden { display: none !important; }
+
+  #unlockOverlay {
+    position: fixed !important;
+    left: 0 !important; top: 0 !important;
+    width: 100% !important; height: 100% !important;
+    background: rgba(0,0,0,0.72);
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    z-index: 110;
+  }
+  #unlockOverlay.hidden { display: none !important; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .victory-card {
+    background: linear-gradient(180deg, #5d4037 0%, #3e2723 40%, #4e342e 100%);
+    padding: 32px 44px;
+    border-radius: 6px;
+    box-shadow:
+      inset 0 0 0 2px #2a1810,
+      inset 0 0 0 5px #5d4037,
+      0 20px 60px rgba(0,0,0,0.7);
+    border: 3px solid #2a1810;
+    text-align: center;
+    min-width: 360px;
+    position: relative;
+    z-index: 1;
+  }
+  .victory-card::after {
+    content: '';
+    position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border: 1px solid rgba(139,90,40,0.15);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+  .victory-title {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 36px;
+    letter-spacing: 4px;
+    color: var(--gold-light);
+    margin-bottom: 6px;
+  }
+  .victory-faction {
+    font-family: 'IM Fell English', 'Georgia', serif;
+    font-size: 22px;
+    color: var(--parchment);
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+  }
+  .victory-divider {
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0 auto 18px;
+  }
+  .victory-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 20px;
+    margin-bottom: 24px;
+    text-align: left;
+  }
+  .victory-stat {
+    font-family: 'IM Fell English', 'Georgia', serif;
+    font-size: 16px;
+    color: var(--parchment-dark);
+  }
+  .victory-stat span {
+    color: var(--parchment);
+    font-size: 20px;
+    font-weight: bold;
+  }
+  .victory-stat.full {
+    grid-column: 1 / -1;
+  }
+  .victory-btn {
+    font-family: 'IM Fell English SC', 'Georgia', serif;
+    font-size: 17px;
+    letter-spacing: 3px;
+    color: var(--parchment);
+    background: linear-gradient(180deg, #6d4c41 0%, #4e342e 100%);
+    border: 2px solid #2a1810;
+    border-radius: 4px;
+    padding: 12px 40px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+    box-shadow: 0 3px 0 #2a1810, 0 4px 12px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 1;
+  }
+  .victory-btn:hover {
+    background: linear-gradient(180deg, #8d6e63 0%, #6d4c41 100%);
+    color: var(--gold-light);
+    border-color: var(--gold-light);
+  }
+
+/* ═══ 名船选船界面 ═══ */
+.selection-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.selection-overlay.hidden { display: none; }
+
+.selection-card {
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  border: 4px solid #5d4037;
+  border-radius: 12px;
+  padding: 24px 28px;
+  max-width: 680px;
+  width: 94%;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.5);
+}
+
+.selection-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 26px;
+  text-align: center;
+  color: #3e2723;
+  margin-bottom: 6px;
+}
+
+.selection-divider {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #c9a94e, transparent);
+  margin: 8px 0 14px;
+}
+
+.selection-subtitle {
+  font-family: 'IM Fell English', serif;
+  font-size: 15px;
+  text-align: center;
+  color: #5d4037;
+  margin-bottom: 16px;
+}
+
+.sel-gold {
+  color: #b8860b;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.selection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 18px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.ship-pick-card {
+  background: rgba(255,255,255,0.28);
+  border: 2px solid #8d6e63;
+  border-radius: 8px;
+  padding: 10px 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ship-pick-card:hover {
+  border-color: #c9a94e;
+  background: rgba(255,255,255,0.48);
+}
+.ship-pick-card.selected {
+  border-color: #c9a94e;
+  background: rgba(201,169,78,0.25);
+  box-shadow: 0 0 10px rgba(201,169,78,0.4);
+}
+.ship-pick-card.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.ship-pick-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.ship-pick-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 15px;
+  color: #3e2723;
+  line-height: 1.2;
+}
+
+.ship-pick-price {
+  font-size: 14px;
+  color: #b8860b;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.ship-pick-type {
+  font-size: 11px;
+  color: #795548;
+  margin-bottom: 2px;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.selection-btn {
+  flex: 1;
+  padding: 10px 12px;
+  border: 2px solid #5d4037;
+  border-radius: 6px;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  white-space: nowrap;
+}
+.selection-btn.confirm {
+  background: linear-gradient(180deg, #5d4037, #3e2723);
+  color: #f4e4c1;
+}
+.selection-btn.confirm:hover {
+  background: linear-gradient(180deg, #795548, #5d4037);
+}
+.selection-btn.refresh {
+  background: transparent;
+  color: #5d4037;
+  border-color: #8d6e63;
+}
+.selection-btn.refresh:hover {
+  background: rgba(0,0,0,0.06);
+  border-color: #5d4037;
+}
+.selection-btn.skip {
+  background: transparent;
+  color: #5d4037;
+}
+.selection-btn.skip:hover {
+  background: rgba(0,0,0,0.08);
+}
+
+.selection-transition-msg {
+  text-align: center;
+  font-family: 'IM Fell English', serif;
+  font-size: 20px;
+  color: #3e2723;
+  padding: 28px 0 16px;
+}
+
+.selection-empty {
+  text-align: center;
+  font-family: 'IM Fell English', serif;
+  font-size: 16px;
+  color: #795548;
+  padding: 20px 0;
+  font-style: italic;
+}
+
+/* 投降按钮 */
+.btn-turn.btn-surrender {
+  background: linear-gradient(180deg, #8b0000 0%, #5c0000 100%);
+  color: #f0d0d0;
+  border-color: #4a0000;
+}
+.btn-turn.btn-surrender:hover {
+  background: linear-gradient(180deg, #a01010 0%, #7a0000 100%);
+  color: #fff;
+}
+
+/* 联机输入框 */
+.mp-room-input::placeholder {
+  color: #8d6e63;
+  letter-spacing: 2px;
+  font-size: 13px;
+}
+
+/* 主动技能按钮 */
+.btn-action.special {
+  background: linear-gradient(180deg, #6d4c41, #5d4037);
+  color: #f4e4c1;
+  border-color: #8d6e63;
+}
+.btn-action.special:hover:not(:disabled) {
+  background: linear-gradient(180deg, #8d6e63, #6d4c41);
+  color: #fff;
+}
+
+/* ═══ 关卡选择界面 ═══ */
+.campaign-overlay, .library-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.campaign-overlay.hidden, .library-overlay.hidden { display: none; }
+
+.campaign-card, .library-card {
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  border: 4px solid #5d4037;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.5);
+}
+
+.campaign-title, .library-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 28px;
+  text-align: center;
+  color: #3e2723;
+  margin-bottom: 4px;
+}
+
+.campaign-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.campaign-level {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+  color: var(--parchment);
+  background: linear-gradient(180deg, #5d4037 0%, #3e2723 100%);
+  border: 2px solid #2a1810;
+  border-radius: 6px;
+  padding: 16px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 3px 0 #1a1008, 0 4px 8px rgba(0,0,0,0.3);
+  text-align: center;
+}
+.campaign-level:hover {
+  background: linear-gradient(180deg, #795548 0%, #5d4037 100%);
+  border-color: var(--gold);
+  color: var(--gold-light);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 #1a1008, 0 6px 12px rgba(0,0,0,0.4);
+}
+.campaign-level.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.campaign-level.completed {
+  border-color: #27ae60;
+  box-shadow: 0 3px 0 #1a5c30, 0 4px 8px rgba(0,0,0,0.3);
+}
+.campaign-level.completed::after {
+  content: ' ✓';
+  color: #27ae60;
+}
+
+.campaign-actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* ═══ 名船库界面 ═══ */
+.library-card {
+  max-width: 580px;
+}
+
+.library-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.library-ship {
+  background: rgba(255,255,255,0.25);
+  border: 2px solid #8d6e63;
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.library-ship.unlocked {
+  border-color: var(--gold);
+  background: rgba(201,169,78,0.15);
+  cursor: pointer;
+}
+.library-ship.unlocked:hover {
+  background: rgba(201,169,78,0.3);
+  border-color: var(--gold-light);
+}
+
+.library-ship.locked {
+  opacity: 0.45;
+}
+
+.lib-ship-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+  color: #5d4037;
+}
+
+.lib-ship-flag {
+  margin-bottom: 6px;
+}
+.lib-ship-flag svg {
+  width: 26px;
+  height: 20px;
+}
+
+.lib-ship-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 13px;
+  color: #3e2723;
+  letter-spacing: 1px;
+}
+
+.lib-ship-skill {
+  font-family: 'IM Fell English', serif;
+  font-size: 10px;
+  color: #795548;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+/* ═══ 关卡通关解锁提示 ═══ */
+.unlock-card {
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  border: 4px solid #5d4037;
+  border-radius: 12px;
+  padding: 28px 36px;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.5), 0 0 60px rgba(201,169,78,0.3);
+}
+
+.unlock-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 24px;
+  color: #8b6914;
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+}
+
+.unlock-ship-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 28px;
+  color: #3e2723;
+  margin: 12px 0 2px;
+}
+
+.unlock-ship-type {
+  font-family: 'IM Fell English', serif;
+  font-size: 13px;
+  color: #795548;
+  margin-bottom: 8px;
+}
+
+.lib-ship-type {
+  font-size: 11px;
+  color: #8b6914;
+  margin-bottom: 3px;
+}
+
+.unlock-flag {
+  margin: 8px 0 12px;
+}
+.unlock-flag svg {
+  width: 30px;
+  height: 24px;
+}
+
+.unlock-ship-skill {
+  font-family: 'IM Fell English', serif;
+  font-size: 13px;
+  color: #5d4037;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  opacity: 0.85;
+}
