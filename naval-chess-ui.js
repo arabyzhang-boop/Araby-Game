@@ -49,7 +49,8 @@ function updateActionButtons() {
   const isCurrentPlayer = ship && ship.playerIndex === currentPlayerIndex && (!mpGameStarted || currentPlayerIndex === mpPlayerIndex);
   const isBoarding = ship && ship.boardingTargets.length > 0;
 
-  btnMove.disabled      = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= 1);
+  var moveBlocked = ship && ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2;
+  btnMove.disabled      = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= 1 && !moveBlocked);
   var tc = ship ? getTurnCost(ship) : 1;
   btnTurnLeft.disabled  = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= tc);
   btnTurnRight.disabled = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= tc);
@@ -65,6 +66,8 @@ function updateActionButtons() {
   var showGreek    = hasSkills && ship.skillData.canGreekFire;
   var showDevour   = hasSkills && ship.skillData.canDevour;
   var showSharks   = hasSkills && ship.skillData.canReleaseSharks;
+  var showMines    = hasSkills && ship.skillData.canLayMines;
+  var showSupply   = hasSkills && ship.skillData.canSupply;
 
   var canSubmerge = showSubmerge && !ship.submergeUsed && !ship.submerged;
   var canSurface  = showSubmerge && ship.submerged;
@@ -72,6 +75,7 @@ function updateActionButtons() {
   var canGreek    = showGreek && !ship.greekFireUsed && !isSubmerged;
   var canDevour = showDevour && !isBoarding && ship.actionsRemaining >= 1 && findBowContact(selectedShipIndex) !== null;
   var canSharks = showSharks && !ship.sharksUsed && !isBoarding;
+  var canMine = showMines && !isBoarding && ship.actionsRemaining >= 1 && ship.minesPlaced < 3;
 
   btnSubmerge.style.display = showSubmerge ? '' : 'none';
   btnSubmerge.textContent = canSurface ? '🌊 上浮' : '🌊 下潜';
@@ -89,7 +93,16 @@ function updateActionButtons() {
   btnSharks.style.display = showSharks ? '' : 'none';
   btnSharks.disabled = !(isCurrentPlayer && !isBoarding && !ship.sharksUsed && ship.actionsRemaining >= 1);
 
-  if (showSubmerge || showBow || showGreek || showDevour || showSharks) {
+  btnMine.style.display = showMines ? '' : 'none';
+  btnMine.disabled = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= 1 && ship.minesPlaced < 3);
+
+  var hasAdjFriendly = selectedShipIndex >= 0 && findAdjacentFriendly(selectedShipIndex) >= 0;
+  btnSupply.style.display = showSupply ? '' : 'none';
+  btnSupply.disabled = !(isCurrentPlayer && hasAdjFriendly && ship.actionsRemaining >= 1 && ship.supplyUsed < 3);
+  btnAmmo.style.display = showSupply ? '' : 'none';
+  btnAmmo.disabled = !(isCurrentPlayer && hasAdjFriendly && ship.actionsRemaining >= 1 && ship.broadsideCount < ship.maxBroadsideCount);
+
+  if (showSubmerge || showBow || showGreek || showDevour || showSharks || showMines || showSupply) {
     skillActions.style.display = '';
   } else {
     skillActions.style.display = 'none';

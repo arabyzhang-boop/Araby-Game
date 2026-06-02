@@ -25,11 +25,21 @@ function afterShipAction(ship, actionDesc, cost) {
   }
 
   checkDevourContacts();
-  if (isCurrentPlayerExhausted()) {
-    log(`${currentPlayerIndex === 1 && gameMode === 'ai' ? '电脑' : '玩家' + (currentPlayerIndex + 1)} 所有舰船行动耗尽，自动切换回合`);
-    switchToNextPlayer();
-    if (gameMode === 'ai' && currentPlayerIndex === 1) {
-      setTimeout(function() { aiTakeTurn(); }, 500);
+  if (isCurrentPlayerExhausted() && !(mpGameStarted && mpRemoteExec)) {
+    if (mpGameStarted) {
+      // 联机模式：向服务器发送 endTurn，等待 turnSwitched，不本地切换
+      if (!sendEndTurn()) {
+        log('[联机] 无法发送结束回合消息，请检查网络连接');
+        return;
+      }
+      mpWaitForTurnSwitch();
+      log('所有舰船行动耗尽，等待服务器确认回合切换…');
+    } else {
+      log(`${currentPlayerIndex === 1 && gameMode === 'ai' ? '电脑' : '玩家' + (currentPlayerIndex + 1)} 所有舰船行动耗尽，自动切换回合`);
+      switchToNextPlayer();
+      if (gameMode === 'ai' && currentPlayerIndex === 1) {
+        setTimeout(function() { aiTakeTurn(); }, 500);
+      }
     }
   } else {
     updateInfoPanel();
@@ -47,6 +57,11 @@ function moveShipForward() {
   if (ship.actionsRemaining < 1) return false;
 
   const dv = DIR_VECTORS[ship.direction];
+  // 铁甲：每回合最多前进2次
+  if (ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2) {
+    log('铁甲限制：本回合已前进2次，无法再前进');
+    return false;
+  }
   const step = ship.submerged ? 2 : 1;
   const newHeadCol = ship.col + dv.dx * step;
   const newHeadRow = ship.row + dv.dy * step;
@@ -71,10 +86,12 @@ function moveShipForward() {
   ship.row = newHeadRow;
   ship.stepsMoved += step;
   ship.chargeSteps += step;
-  // 检查是否撞上鲨鱼
+  if (ship.skillData && ship.skillData.ironArmor) ship.ironArmorMoves++;
+  // 检查是否撞上鲨鱼/水雷
   if (!ship.submerged) {
     var destroyed = checkSharkCollision(getShipCells(ship), ship);
     if (destroyed) return true;
+    if (checkMineCollision(getShipCells(ship), ship)) return true;
   }
   const coord = `${String.fromCharCode(65 + ship.col)}${ship.row + 1}`;
   const dirName = DIR_NAMES[ship.direction];
@@ -128,10 +145,11 @@ function turnShip(delta) {
     }
   }
 
-  // 检查转向时是否扫过鲨鱼（必须在改方向前，避免部分状态变更）
+  // 检查转向时是否扫过鲨鱼/水雷
   if (!ship.submerged && swept.length > 0) {
     var destroyed = checkSharkCollision(swept, ship);
     if (destroyed) return true;
+    if (checkMineCollision(swept, ship)) return true;
   }
 
   ship.direction = newDir;
@@ -167,7 +185,8 @@ function fireBroadside() {
     for (let i = 0; i < ship.length; i++) {
       const ox = ship.col + dv.dx * i;
       const oy = ship.row + dv.dy * i;
-      for (let r = 1; r <= 2; r++) {
+      var broadRange = ship.skillData && ship.skillData.firepowerBoost ? 3 : 2;
+      for (let r = 1; r <= broadRange; r++) {
         const tc = ox + sd.dx * r;
         const tr = oy + sd.dy * r;
         if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
@@ -196,16 +215,45 @@ function fireBroadside() {
     }
   }
 
+  // 铁甲：一轮舷炮自伤至多1点（多枚视作一次），伤害-1（可减至0）
+  if (ship.skillData && ship.skillData.ironArmor) selfDamage = Math.min(selfDamage, 1);
   if (selfDamage > 0) {
-    ship.hp -= selfDamage;
-    log(`舷炮贴脸开火！${shipName(selectedShipIndex)} 有 ${selfDamage} 格与敌舰贴身，自身受到 ${selfDamage} 点反冲伤害（剩余 ${ship.hp} HP）`);
+    var actualDmg = selfDamage;
+    if (ship.skillData && ship.skillData.ironArmor) {
+      actualDmg = selfDamage - 1;
+      if (selfDamage > actualDmg) addHitEffect(ship.col, ship.row, '🛡️');
+    }
+    if (actualDmg > 0) {
+      ship.hp -= actualDmg;
+      log(`舷炮贴脸开火！${shipName(selectedShipIndex)} 有 ${selfDamage} 格与敌舰贴身，自身受到 ${actualDmg} 点反冲伤害（剩余 ${ship.hp} HP）`);
+    } else {
+      log(`舷炮贴脸开火！${shipName(selectedShipIndex)} 的铁甲完全抵御了反冲伤害`);
+    }
   }
 
+  // 铁甲：每轮舷炮多枚命中视作1次，总伤害-1（至少1点）
+  var ironArmorHits = {};
   for (const hit of hits) {
     ships[hit.shipIdx].hp--;
     addHitEffect(hit.col, hit.row);
     const tag = hit.isFriendly ? '友军' : '敌军';
     log(`炮弹命中${tag}${shipName(hit.shipIdx)}，造成 1 点伤害（剩余 ${ships[hit.shipIdx].hp} HP）`);
+    if (ships[hit.shipIdx].skillData && ships[hit.shipIdx].skillData.ironArmor) {
+      ironArmorHits[hit.shipIdx] = (ironArmorHits[hit.shipIdx] || 0) + 1;
+    }
+  }
+  var iaKeys = Object.keys(ironArmorHits);
+  for (var iak = 0; iak < iaKeys.length; iak++) {
+    var iaIdx = parseInt(iaKeys[iak]);
+    var actualDmg = ironArmorHits[iaIdx] - 1; // 铁甲：伤害-1（可减至0）
+    if (actualDmg < 0) actualDmg = 0;
+    ships[iaIdx].hp += (ironArmorHits[iaIdx] - actualDmg);
+    if (ironArmorHits[iaIdx] > actualDmg) addHitEffect(ships[iaIdx].col, ships[iaIdx].row, '🛡️');
+    if (actualDmg > 0) {
+      log(`${shipName(iaIdx)} 的铁甲减免了 ${ironArmorHits[iaIdx] - actualDmg} 点舷炮伤害（剩余 ${ships[iaIdx].hp} HP）`);
+    } else {
+      log(`${shipName(iaIdx)} 的铁甲完全抵御了舷炮伤害`);
+    }
   }
 
   // 收集被击沉的船只对象（用对象引用而非索引，避免连锁移除导致索引错位）
@@ -264,9 +312,10 @@ function initiateRamming() {
   ship.stepsMoved++;
   ship.chargeSteps++;
 
-  // 冲锋路径上撞到鲨鱼
+  // 冲锋路径上撞到鲨鱼/水雷
   var destroyedByShark = checkSharkCollision(getShipCells(ship), ship);
   if (destroyedByShark) return true;
+  if (checkMineCollision(getShipCells(ship), ship)) return true;
 
   // 接触判定（冲锋后船头紧贴敌方）
   var eDv = DIR_VECTORS[enemy.direction];
@@ -282,11 +331,22 @@ function initiateRamming() {
     defDmg = dmg;
     log(`冲锋撞击敌方船舷！自身受到 ${atkDmg} 点反冲伤害，敌方受到 ${defDmg} 点伤害`);
   } else {
-    atkDmg = dmg;
-    defDmg = dmg;
-    log(`冲锋船头对撞！双方各受到 ${dmg} 点伤害`);
+    atkDmg = Math.min(dmg, ship.length);
+    defDmg = Math.min(dmg, ship.length);
+    log(`冲锋船头对撞！双方各受到 ${atkDmg} 点伤害${dmg > ship.length ? '（已达撞击船体积上限）' : ''}`);
   }
 
+  // 铁甲：仅船舷受撞击时伤害-1（可减至0）
+  // 龟船：任何撞击伤害-1（可减至0）
+  if (contactType === 'side' && enemy.skillData && enemy.skillData.ironArmor) {
+    if (defDmg > 0) { defDmg--; addHitEffect(enemy.col, enemy.row, '🛡️'); }
+  }
+  if (enemy.skillData && enemy.skillData.turtleShip) {
+    if (defDmg > 0) { defDmg--; addHitEffect(enemy.col, enemy.row, '🛡️'); }
+  }
+  if (ship.skillData && ship.skillData.turtleShip) {
+    if (atkDmg > 0) { atkDmg--; addHitEffect(ship.col, ship.row, '🛡️'); }
+  }
   ship.hp -= atkDmg;
   enemy.hp -= defDmg;
 
@@ -633,6 +693,128 @@ function checkDevourContacts() {
       }
     }
   }
+}
+
+// ── 补给 / 弹药支援（乌尔卡号） ──
+function findAdjacentFriendly(shipIndex) {
+  var ship = ships[shipIndex];
+  if (!ship) return -1;
+  var sc = getShipCells(ship);
+  var aDv = DIR_VECTORS[ship.direction];
+  for (var j = 0; j < ships.length; j++) {
+    if (j === shipIndex) continue;
+    if (ships[j].playerIndex !== ship.playerIndex) continue;
+    var ec = getShipCells(ships[j]);
+    var bDv = DIR_VECTORS[ships[j].direction];
+    for (var si = 0; si < sc.length; si++) {
+      for (var ei = 0; ei < ec.length; ei++) {
+        var dc = ec[ei].col - sc[si].col;
+        var dr = ec[ei].row - sc[si].row;
+        if (Math.abs(dc) + Math.abs(dr) !== 1) continue;
+        if ((dc * aDv.dx + dr * aDv.dy) !== 0) continue;
+        if ((dc * bDv.dx + dr * bDv.dy) !== 0) continue;
+        return j;
+      }
+    }
+  }
+  return -1;
+}
+
+function supplyShip() {
+  if (gameOver) return false;
+  if (selectedShipIndex < 0) return false;
+  var ship = ships[selectedShipIndex];
+  if (ship.playerIndex !== currentPlayerIndex) return false;
+  if (!ship.skillData || !ship.skillData.canSupply) { log('该舰船没有补给技能'); return false; }
+  if (ship.actionsRemaining < 1) { log('行动力不足'); return false; }
+  if (ship.supplyUsed >= 3) { log('补给次数已用完'); return false; }
+
+  var targetIdx = findAdjacentFriendly(selectedShipIndex);
+  if (targetIdx < 0) { log('没有船舷相接触的友军舰船'); return false; }
+
+  var target = ships[targetIdx];
+  if (target.hp >= target.maxHp) { log('友军舰船生命值已满'); return false; }
+
+  target.hp++;
+  ship.supplyUsed++;
+  addHitEffect(target.col, target.row, '❤️‍🩹');
+  afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 回复1点生命（剩余 ${target.hp} HP）`, 1);
+  return true;
+}
+
+function ammoSupport() {
+  if (gameOver) return false;
+  if (selectedShipIndex < 0) return false;
+  var ship = ships[selectedShipIndex];
+  if (ship.playerIndex !== currentPlayerIndex) return false;
+  if (!ship.skillData || !ship.skillData.canSupply) { log('该舰船没有弹药支援技能'); return false; }
+  if (ship.actionsRemaining < 1) { log('行动力不足'); return false; }
+  if (ship.broadsideCount >= ship.maxBroadsideCount) { log('自身舷炮已耗尽，无法支援'); return false; }
+
+  var targetIdx = findAdjacentFriendly(selectedShipIndex);
+  if (targetIdx < 0) { log('没有船舷相接触的友军舰船'); return false; }
+
+  var target = ships[targetIdx];
+  if (target.broadsideCount === 0) { log('友军舰船未使用舷炮，无需支援'); return false; }
+
+  target.broadsideCount--;
+  ship.broadsideCount = ship.maxBroadsideCount;
+  addHitEffect(target.col, target.row, '🔧');
+  afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 补充了一次舷炮`, 1);
+  return true;
+}
+
+// ── 布雷（屠夫号） ──
+function enterMinePlacement() {
+  if (gameOver) return false;
+  if (selectedShipIndex < 0) return false;
+  var ship = ships[selectedShipIndex];
+  if (ship.playerIndex !== currentPlayerIndex) return false;
+  if (!ship.skillData || !ship.skillData.canLayMines) { log('该舰船没有布雷技能'); return false; }
+  if (ship.boardingTargets.length > 0) { log('无法布雷：正处于接舷战中'); return false; }
+  if (ship.actionsRemaining < 1) { log('行动力不足，无法布雷'); return false; }
+  if (ship.minesPlaced >= 3) { log('水雷已用完（本局3次）'); return false; }
+
+  minePlacementMode = true;
+  minePlacementShip = ship;
+  log('请点击棋盘空格布设水雷（船体周围一圈10格）');
+  return true;
+}
+
+function placeMineAt(col, row) {
+  if (!minePlacementMode || !minePlacementShip) return false;
+  var ship = minePlacementShip;
+
+  // 检查范围：仅限船体周围一圈（3×4矩形，不含船体自身2格）
+  var cells = getShipCells(ship);
+  var inRange = false;
+  for (var ci = 0; ci < cells.length; ci++) {
+    var dc = Math.abs(cells[ci].col - col);
+    var dr = Math.abs(cells[ci].row - row);
+    if (dc <= 1 && dr <= 1 && !(dc === 0 && dr === 0)) { inRange = true; break; }
+  }
+  if (!inRange) { log('水雷只能布设在船体周围一圈的10格内'); return false; }
+
+  // 检查是否被占据
+  if (findShipAt(col, row) >= 0 || isCellOccupied(col, row, -1)) {
+    log('该格已被占据，无法布雷');
+    return false;
+  }
+  // 检查是否已有水雷
+  for (var mi = 0; mi < mines.length; mi++) {
+    if (mines[mi].col === col && mines[mi].row === row) {
+      log('该格已有水雷');
+      return false;
+    }
+  }
+
+  mines.push({ col: col, row: row });
+  ship.minesPlaced++;
+  minePlacementMode = false;
+  minePlacementShip = null;
+
+  afterShipAction(ship, `屠夫号在 ${String.fromCharCode(65 + col)}${row + 1} 布设水雷`, 1);
+  return true;
 }
 
 // ── 僵尸鲨鱼（沉默玛丽号） ──

@@ -79,7 +79,8 @@ function clearBrokenBoarding() {
         }
         ship.boardingTargets.splice(ti, 1);
         if (ship.boardingTargets.length === 0) {
-          log(`${shipName(i)} 因碰撞脱离接触，接舷战结束`);
+          log(`${shipName(i)} 因碰撞脱离接触，接舷战结束，恢复行动力`);
+          ship.actionsRemaining = ship.maxActions;
         }
       }
     }
@@ -132,7 +133,8 @@ function removeShip(shipIndex) {
     if (target) {
       target.boardingTargets = target.boardingTargets.filter(function(idx) { return idx !== shipIndex; });
       if (target.boardingTargets.length === 0) {
-        log(`${shipName(targetIdx)} 接舷战结束，恢复自由`);
+        log(`${shipName(targetIdx)} 接舷战结束，恢复自由，行动力重置`);
+        target.actionsRemaining = target.maxActions;
       }
     }
   }
@@ -297,6 +299,30 @@ function checkSharkCollision(cells, ship) {
   return false;
 }
 
+// ── 检查船只移动/转向是否撞上水雷 ──
+function checkMineCollision(cells, ship) {
+  if (mines.length === 0) return false;
+  var shipIdx = ships.indexOf(ship);
+  for (var mi = mines.length - 1; mi >= 0; mi--) {
+    for (var ci = 0; ci < cells.length; ci++) {
+      if (mines[mi].col === cells[ci].col && mines[mi].row === cells[ci].row) {
+        ship.hp--;
+        addHitEffect(mines[mi].col, mines[mi].row, '💥');
+        log(`${shipName(shipIdx)} 触发了水雷，受到 1 点伤害（剩余 ${ship.hp} HP）`);
+        mines.splice(mi, 1);
+        if (ship.hp <= 0) {
+          logSink(shipIdx, shipIdx, '水雷');
+          removeShip(shipIdx);
+          checkVictory();
+          return true;
+        }
+        break;
+      }
+    }
+  }
+  return false;
+}
+
 // ── 切换到下一个玩家 ──
 function switchToNextPlayer() {
   if (gameOver) return;
@@ -313,6 +339,7 @@ function switchToNextPlayer() {
       s.actionsRemaining = s.maxActions;
       s.stepsMoved = 0;
       s.chargeSteps = 0;
+      if (s.ironArmorMoves !== undefined) s.ironArmorMoves = 0;
       // 舷炮次数全局不重置（每局每船 1 次，努力号 2 次）
       // 下潜回合递减
       if (s.submerged) {

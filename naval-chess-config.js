@@ -56,6 +56,9 @@ var btnBowCannon    = document.getElementById('btnBowCannon');
 var btnGreekFire    = document.getElementById('btnGreekFire');
 var btnDevour       = document.getElementById('btnDevour');
 var btnSharks       = document.getElementById('btnSharks');
+var btnMine         = document.getElementById('btnMine');
+var btnSupply       = document.getElementById('btnSupply');
+var btnAmmo         = document.getElementById('btnAmmo');
 var skillActions    = document.getElementById('skillActions');
 var elLogArea       = document.getElementById('logArea');
 var btnMove         = document.getElementById('btnMove');
@@ -78,6 +81,11 @@ var hitEffects = [];
 
 // ── 鲨鱼 ──
 var sharks = [];
+
+// ── 水雷 ──
+var mines = [];
+var minePlacementMode = false;
+var minePlacementShip = null;
 
 // ── AI 超时保护 ──
 var aiFailsafeTimer = null;

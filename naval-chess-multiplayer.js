@@ -10,9 +10,14 @@ var mpGameStarted = false;
 var mpConnected = false;
 var mpPendingSend = null;
 var mpIsHost = false;
+var mpGameSpeed = 'classic'; // 联机模式速度
+var mpWaitingForTurnSwitch = false; // 等待服务器确认回合切换
+var mpTurnSwitchTimer = null; // 回合切换超时重试定时器
+var mpPingTimer = null; // 心跳定时器
 
 // 联机服务器地址：本地测试用 localhost，部署后替换为 Render 地址
-var MP_SERVER = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+// file:// 协议或本地访问 → 连本地服务器；否则连生产环境
+var MP_SERVER = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'ws://localhost:3000'
   : 'wss://araby-game.onrender.com';
 
@@ -36,6 +41,11 @@ function createMultiplayerUI() {
         '<button class="menu-item" id="btnMpJoin" style="padding:14px 24px;">加入房间</button>' +
       '</div>' +
       '<div id="mpStatusText" style="font-size:12px;margin-top:8px;opacity:0.7;"></div>' +
+      '<div class="menu-items hidden" id="mpModeSelect">' +
+        '<div class="menu-subtitle" style="margin-bottom:12px;">选择房间模式</div>' +
+        '<button class="menu-item" id="btnMpClassic">经典模式</button>' +
+        '<button class="menu-item" id="btnMpSpeed">极速模式</button>' +
+      '</div>' +
       '<button class="menu-item" id="btnMpBack" style="font-size:14px;opacity:0.7;margin-top:4px;">返回</button>' +
     '</div>' +
   '</div>';
@@ -69,6 +79,7 @@ function mpStatus(msg, isError) {
 // ── WebSocket ──
 function mpConnect() {
   if (mpSocket) { mpSocket.close(); }
+  console.log('[MP] 连接目标:', MP_SERVER);
   mpStatus('正在连接服务器…');
   mpSocket = new WebSocket(MP_SERVER);
   mpSocket.onopen = function() {
@@ -78,14 +89,26 @@ function mpConnect() {
       mpSocket.send(JSON.stringify(mpPendingSend));
       mpPendingSend = null;
     }
+    // 启动心跳（每25秒发送ping，服务器30秒超时检测）
+    clearInterval(mpPingTimer);
+    mpPingTimer = setInterval(function() {
+      if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+        mpSocket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 25000);
   };
   mpSocket.onmessage = function(e) {
-    var msg = JSON.parse(e.data);
-    handleServerMessage(msg);
+    try {
+      var msg = JSON.parse(e.data);
+      handleServerMessage(msg);
+    } catch (err) {
+      console.error('[MP] 消息处理异常:', err);
+    }
   };
   mpSocket.onclose = function() {
     mpConnected = false;
     mpStatus('连接已断开', true);
+    clearInterval(mpPingTimer);
   };
   mpSocket.onerror = function() {
     mpStatus('无法连接服务器，请确认服务器已启动', true);
@@ -147,6 +170,33 @@ function handleServerMessage(msg) {
       }
       break;
 
+    case 'endTurn':
+      // 兼容旧版服务器：endTurn 仍作为顶层消息中继
+      mpWaitingForTurnSwitch = false;
+      clearTimeout(mpTurnSwitchTimer);
+      if (mpGameStarted && !gameOver) {
+        switchToNextPlayer();
+        selectedShipIndex = -1;
+        btnEndTurn.disabled = false;
+        updateInfoPanel();
+        render();
+      }
+      break;
+
+    case 'turnSwitched':
+      // 新版服务器：权威回合切换（双方都收到）
+      mpWaitingForTurnSwitch = false;
+      clearTimeout(mpTurnSwitchTimer);
+      if (mpGameStarted && !gameOver) {
+        switchToNextPlayer();
+        selectedShipIndex = -1;
+        btnEndTurn.disabled = false;
+        updateInfoPanel();
+        render();
+        log((mpPlayerIndex === currentPlayerIndex ? '轮到你的回合' : '对方回合，请等待'));
+      }
+      break;
+
     case 'opponentSurrendered':
       if (mpGameStarted && !gameOver) {
         mpEndGame('对方投降！你获得了胜利');
@@ -159,6 +209,35 @@ function handleServerMessage(msg) {
       }
       break;
 
+    case 'actionRejected':
+      log('[服务器] 行动被拒绝: ' + (msg.reason || '未知原因'));
+      mpWaitingForTurnSwitch = false;
+      clearTimeout(mpTurnSwitchTimer);
+      btnEndTurn.disabled = false;
+      if (msg.currentTurn !== undefined && mpPlayerIndex === msg.currentTurn) {
+        // 服务器说现在是我们回合，但本地还没切换（turnSwitched 可能丢失）
+        if (currentPlayerIndex !== msg.currentTurn) {
+          log('[服务器] 回合状态不同步，正在自动修复…');
+          switchToNextPlayer();
+          updateInfoPanel();
+          render();
+        }
+      }
+      break;
+
+    case 'roomClosed':
+      mpWaitingForTurnSwitch = false;
+      clearTimeout(mpTurnSwitchTimer);
+      mpGameStarted = false;
+      gameOver = true;
+      mpStatus('房间已关闭: ' + (msg.reason || '未知原因'), true);
+      log('连接已断开，房间已关闭');
+      break;
+
+    case 'pong':
+      // 心跳响应，无需处理
+      break;
+
     case 'error':
       mpStatus(msg.message, true);
       break;
@@ -167,23 +246,22 @@ function handleServerMessage(msg) {
 
 // ── 选船同步 ──
 function mpGenerateAndSyncSelection() {
-  // 生成红方选项
-  shuffledFamousLibrary = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
-  var half = Math.ceil(shuffledFamousLibrary.length / 2);
-  shipSelectionState.famousPool = shuffledFamousLibrary.slice(0, half);
+  // 红方：全体名船
+  redSelectedFamousNames = [];
+  shipSelectionState.famousPool = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
   var redOptions = generateShipOptions();
-  shipSelectionState.famousPool = shuffledFamousLibrary.slice(half);
-  var blueOptions = generateShipOptions2();
+  // 蓝方暂不生成，等红方确认后再根据其选择生成
+  var blueOptions = null;
 
   // 房主本地保存双方选项
   mpSavedRedOptions = redOptions;
   mpSavedBlueOptions = blueOptions;
 
-  // 发送给客机
+  // 发送红方选项给客机
   mpSocket.send(JSON.stringify({
     type: 'selectionData',
     redOptions: redOptions,
-    blueOptions: blueOptions,
+    blueOptions: null,
     currentPlayer: 0
   }));
 
@@ -197,11 +275,14 @@ function generateShipOptions2() {
 }
 
 function mpApplySelectionData(msg) {
-  // 接收房主生成的选船数据
-  mpShowSelection(msg.currentPlayer, msg.currentPlayer === 0 ? msg.redOptions : msg.blueOptions);
-  // 保存双方选项
+  if (!msg.redOptions) {
+    mpStatus('选船数据异常，请重试', true);
+    return;
+  }
   mpSavedRedOptions = msg.redOptions;
-  mpSavedBlueOptions = msg.blueOptions;
+  if (msg.blueOptions) mpSavedBlueOptions = msg.blueOptions;
+  var opts = msg.currentPlayer === 1 && msg.blueOptions ? msg.blueOptions : msg.redOptions;
+  mpShowSelection(msg.currentPlayer || 0, opts);
 }
 
 var mpSavedRedOptions = null;
@@ -209,12 +290,16 @@ var mpSavedBlueOptions = null;
 var mpCurrentSelectionPlayer = -1;
 
 function mpShowSelection(playerIdx, options) {
+  if (!options || options.length === 0) {
+    mpStatus('选船数据为空，请重试', true);
+    return;
+  }
   mpCurrentSelectionPlayer = playerIdx;
   shipSelectionState.currentPlayer = playerIdx;
   shipSelectionState.gold = 15;
   shipSelectionState.selectedIndices = [];
   shipSelectionState.availableShips = options;
-  shipSelectionState.famousPool = []; // 不刷新
+  shipSelectionState.famousPool = [];
 
   var isMyTurn = (playerIdx === mpPlayerIndex);
 
@@ -283,10 +368,15 @@ function mpInstallSelectionHooks() {
     // 本地处理
     if (mpPlayerIndex === 0) {
       shipSelectionState.redPicks = picks;
-      // 红方确认后显示蓝方选船界面
-      if (mpSavedBlueOptions) {
-        mpShowSelection(1, mpSavedBlueOptions);
-      }
+      redSelectedFamousNames = picks.filter(function(p) { return p.isFamous; }).map(function(p) { return p.name; });
+      // 生成蓝方选项（排除红方已选名船）
+      shipSelectionState.famousPool = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; })
+        .filter(function(s) { return redSelectedFamousNames.indexOf(s.name) < 0; });
+      var blueOpts = generateShipOptions();
+      mpSavedBlueOptions = blueOpts;
+      // 同步蓝方选项到客机
+      mpSocket.send(JSON.stringify({ type: 'selectionData', redOptions: mpSavedRedOptions, blueOptions: blueOpts, currentPlayer: 1 }));
+      mpShowSelection(1, blueOpts);
     } else {
       shipSelectionState.bluePicks = picks;
       if (mpIsHost) {
@@ -381,8 +471,13 @@ function mpGenerateFleetPositions(redPicks, bluePicks) {
   ships = [];
   var redFleet = (redPicks && redPicks.length > 0) ? redPicks : getDefaultFleet();
   var blueFleet = (bluePicks && bluePicks.length > 0) ? bluePicks : getDefaultFleet();
-  placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
-  placeFleet(blueFleet, 1, 16, 19, [DIR.N, DIR.W, DIR.S]);
+  if (mpGameSpeed === 'speed') {
+    placeFleet(redFleet, 0, 5, 10, [DIR.N, DIR.E, DIR.S], 6, 15);
+    placeFleet(blueFleet, 1, 9, 14, [DIR.N, DIR.W, DIR.S], 6, 15);
+  } else {
+    placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
+    placeFleet(blueFleet, 1, 16, 19, [DIR.N, DIR.W, DIR.S]);
+  }
   // 用 JSON 深拷贝确保所有属性完整传递
   var fleetData = JSON.parse(JSON.stringify(ships));
   ships = [];
@@ -451,21 +546,59 @@ function sendAction(action) {
   }
 }
 
+function sendEndTurn() {
+  if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+    mpSocket.send(JSON.stringify({ type: 'endTurn' }));
+    return true;
+  }
+  return false;
+}
+
+// 设置回合切换等待状态，带超时自动重试
+function mpWaitForTurnSwitch() {
+  mpWaitingForTurnSwitch = true;
+  btnEndTurn.disabled = true;
+  clearTimeout(mpTurnSwitchTimer);
+  mpTurnSwitchTimer = setTimeout(function() {
+    if (mpWaitingForTurnSwitch && mpGameStarted && !gameOver) {
+      log('[联机] 未收到服务器确认，正在重新发送…');
+      if (sendEndTurn()) {
+        // 重新设置超时
+        mpTurnSwitchTimer = setTimeout(function() {
+          if (mpWaitingForTurnSwitch && mpGameStarted && !gameOver) {
+            log('[联机] 服务器无响应，请检查连接后重试');
+            mpWaitingForTurnSwitch = false;
+            btnEndTurn.disabled = false;
+          }
+        }, 3000);
+      } else {
+        log('[联机] 无法发送消息，连接已断开');
+        mpWaitingForTurnSwitch = false;
+        btnEndTurn.disabled = false;
+      }
+    }
+  }, 3000);
+}
+
 var mpRemoteExec = false; // 远程执行中标志
 
 function applyRemoteAction(action) {
   mpRemoteExec = true;
-  // 切换为对方回合视角执行行动
   var savedPlayer = currentPlayerIndex;
   currentPlayerIndex = action.playerIndex != null ? action.playerIndex : (1 - mpPlayerIndex);
 
+  // 对方结束回合：兼容旧版代码（endTurn 通过 action 中继）和自动耗尽场景
   if (action.type === 'endTurn') {
+    mpWaitingForTurnSwitch = false;
+    clearTimeout(mpTurnSwitchTimer);
     switchToNextPlayer();
-    // 不恢复 currentPlayerIndex——回合切换应永久生效
     mpRemoteExec = false;
-    updateInfoPanel(); render();
+    selectedShipIndex = -1;
+    btnEndTurn.disabled = false;
+    render();
     return;
   }
+
   if (action.shipIdx !== undefined) {
     selectedShipIndex = action.shipIdx;
   }
@@ -485,7 +618,7 @@ function applyRemoteAction(action) {
   currentPlayerIndex = savedPlayer;
   mpRemoteExec = false;
   selectedShipIndex = -1;
-  updateInfoPanel();
+  // 仅刷新棋盘，不动面板（避免屏幕抖动）
   render();
 }
 
@@ -516,6 +649,9 @@ function mpEndGame(msg) {
 }
 
 function cleanupMultiplayer() {
+  clearTimeout(mpTurnSwitchTimer);
+  clearInterval(mpPingTimer);
+  mpWaitingForTurnSwitch = false;
   if (mpSocket) { mpSocket.close(); mpSocket = null; }
   mpRoom = null; mpPlayerIndex = -1; mpGameStarted = false; mpIsHost = false;
   btnReset.textContent = '重置';
@@ -534,13 +670,30 @@ document.getElementById('btnMulti').addEventListener('click', function() {
 });
 
 document.getElementById('btnMpHost').addEventListener('click', function() {
-  mpPendingSend = { type: 'create' };
+  document.getElementById('mpModeSelect').classList.remove('hidden');
+  document.getElementById('btnMpHost').style.display = 'none';
+  document.getElementById('btnMpJoin').style.display = 'none';
+  document.querySelector('#mpMenuScreen .mp-room-input').style.display = 'none';
+});
+
+function mpCreateRoom() {
+  mpPendingSend = { type: 'create', speed: mpGameSpeed };
   if (!mpConnected || mpSocket.readyState !== WebSocket.OPEN) {
     mpConnect();
   } else {
     mpSocket.send(JSON.stringify(mpPendingSend));
     mpPendingSend = null;
   }
+}
+
+document.getElementById('btnMpClassic').addEventListener('click', function() {
+  mpGameSpeed = 'classic';
+  mpCreateRoom();
+});
+
+document.getElementById('btnMpSpeed').addEventListener('click', function() {
+  mpGameSpeed = 'speed';
+  mpCreateRoom();
 });
 
 document.getElementById('btnMpJoin').addEventListener('click', function() {

@@ -287,7 +287,7 @@
   .btn-turn {
     flex: 1;
     font-family: 'IM Fell English SC', 'Georgia', serif;
-    font-size: 13px;
+    font-size: 10px;
     letter-spacing: 1px;
     padding: 10px;
     border-radius: 4px;
@@ -297,6 +297,7 @@
     border: 2px solid;
   }
   .btn-end-turn {
+    flex: 1.4;
     background: linear-gradient(180deg, #8b2500 0%, #5c1800 100%);
     color: var(--parchment);
     border-color: #3a0f00;
@@ -308,6 +309,7 @@
   }
 
   .btn-reset {
+    flex: 0.7;
     background: linear-gradient(180deg, #555 0%, #333 100%);
     color: #ccc;
     border-color: #222;
@@ -317,9 +319,10 @@
     background: linear-gradient(180deg, #4a6d3b 0%, #2d4a1e 100%);
     color: #c8d8b0;
     border-color: #1a2e10;
-    font-size: 11px;
-    min-width: 56px;
-    flex: 0.6;
+    white-space: nowrap;
+    letter-spacing: 0;
+    min-width: 44px;
+    padding: 10px 2px;
   }
   .btn-music:hover {
     background: linear-gradient(180deg, #5a8a45 0%, #3d5e2a 100%);
@@ -458,6 +461,12 @@
     .victory-card { padding: 20px 20px; min-width: auto; max-width: 92vw; }
     .victory-title { font-size: 26px; }
     .unlock-card { max-width: 90vw; padding: 20px; }
+    .help-card { max-width: 96vw; padding: 14px; }
+    .help-body { flex-direction: column; }
+    .help-sidebar { flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 2px solid rgba(139,90,40,0.2); padding-right: 0; padding-bottom: 8px; margin-bottom: 8px; }
+    .help-nav { font-size: 11px; padding: 5px 8px; }
+    .help-content { max-height: 40vh; }
+    .help-section h3 { font-size: 15px; }
   }
 
   /* ── 初始菜单 ── */
@@ -856,6 +865,120 @@
   color: #795548;
   padding: 20px 0;
   font-style: italic;
+}
+
+/* 帮助按钮 */
+.btn-turn.btn-help {
+  background: linear-gradient(180deg, #4a6d6d 0%, #2d4a4a 100%);
+  color: #b0d0d0;
+  border-color: #1a2e2e;
+  white-space: nowrap;
+  letter-spacing: 0;
+  min-width: 36px;
+  padding: 10px 2px;
+}
+.btn-turn.btn-help:hover {
+  background: linear-gradient(180deg, #5a8a8a 0%, #3d5e5e 100%);
+  color: #d0f0f0;
+}
+
+/* 帮助弹窗 */
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+}
+.help-overlay.hidden { display: none; }
+
+.help-card {
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  border: 4px solid #5d4037;
+  border-radius: 12px;
+  padding: 20px 24px;
+  max-width: 720px;
+  width: 92%;
+  max-height: 82vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.5);
+  position: relative;
+}
+
+.help-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 22px;
+  text-align: center;
+  color: #3e2723;
+  margin-bottom: 4px;
+}
+
+.help-body {
+  display: flex;
+  gap: 16px;
+  min-height: 300px;
+}
+
+.help-sidebar {
+  flex: 0 0 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 2px solid rgba(139,90,40,0.2);
+  padding-right: 12px;
+}
+
+.help-nav {
+  display: block;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 13px;
+  color: #5d4037;
+  padding: 7px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+  text-align: center;
+  user-select: none;
+  text-decoration: none;
+}
+.help-nav:hover {
+  background: rgba(201,169,78,0.2);
+  color: #3e2723;
+}
+.help-nav.active {
+  background: rgba(201,169,78,0.35);
+  color: #3e2723;
+  font-weight: bold;
+}
+
+.help-content {
+  flex: 1;
+  font-family: 'IM Fell English', serif;
+  font-size: 13px;
+  color: #3e2723;
+  line-height: 1.6;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.help-section {
+  display: none;
+}
+.help-section.active {
+  display: block;
+}
+.help-section h3 {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 17px;
+  color: #8b2500;
+  margin-bottom: 8px;
+  border-bottom: 1px dotted rgba(139,90,40,0.3);
+  padding-bottom: 4px;
+}
+.help-section p {
+  margin-bottom: 8px;
 }
 
 /* 投降按钮 */

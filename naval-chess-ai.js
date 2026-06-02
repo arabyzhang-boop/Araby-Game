@@ -1504,11 +1504,8 @@ function mctsSearch(iterations) {
 
 // ── AI 自动选船（人机练习） ──
 function aiAutoSelect() {
-  if (shuffledFamousLibrary.length === 0) {
-    shuffledFamousLibrary = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
-  }
-  var half = Math.ceil(shuffledFamousLibrary.length / 2);
-  var famousPool = shuffledFamousLibrary.slice(half).slice();
+  var allFamous = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
+  var famousPool = allFamous.filter(function(s) { return redSelectedFamousNames.indexOf(s.name) < 0; });
   var options = [];
   var normalId = 1;
   for (var i = 0; i < 9; i++) {
@@ -1558,7 +1555,7 @@ function aiAutoSelect() {
     gold -= 1;
     options = [];
     normalId = 1;
-    famousPool = shuffledFamousLibrary.slice(half).slice();
+    famousPool = allFamous.filter(function(s) { return redSelectedFamousNames.indexOf(s.name) < 0; });
     for (var i2 = 0; i2 < 9; i2++) {
       var r2 = Math.random();
       if (r2 < 0.25 && famousPool.length > 0) {

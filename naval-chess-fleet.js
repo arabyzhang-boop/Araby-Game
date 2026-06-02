@@ -49,7 +49,7 @@ function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinO
           hp: def.length, maxHp: def.length,
           actionsRemaining: 3, maxActions: 3,
           boardingTargets: [], stepsMoved: 0, chargeSteps: 0,
-          broadsideCount: 0, maxBroadsideCount: 1,
+          broadsideCount: 0, maxBroadsideCount: def.skillData && def.skillData.turtleShip ? 0 : 1,
           name: def.name || null, skill: def.skill || null,
           skillData: def.skillData || null,
           flagColor: def.flagColor || null, flagShape: def.flagShape || null,
@@ -58,7 +58,8 @@ function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinO
           submerged: false, submergedTurns: 0, submergeUsed: false,
           bowCannonUsed: false, greekFireUsed: false,
           devourTarget: -1, devourProgress: 0,
-          sharksUsed: false
+          sharksUsed: false, ironArmorMoves: 0,
+          minesPlaced: 0, supplyUsed: 0
         };
         // 应用名船技能效果
         if (def.skillData) {

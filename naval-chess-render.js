@@ -308,6 +308,7 @@ function render() {
     drawSelectionHighlight(ships[selectedShipIndex]);
   }
   drawSharks();
+  drawMines();
   drawHitEffects();
 }
 
@@ -322,6 +323,21 @@ function drawSharks() {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('🦈', px, py);
+    ctx.restore();
+  }
+}
+
+// ── 水雷渲染 ──
+function drawMines() {
+  for (var mi = 0; mi < mines.length; mi++) {
+    var m = mines[mi];
+    var px = m.col * CELL_SIZE + CELL_SIZE / 2;
+    var py = m.row * CELL_SIZE + CELL_SIZE / 2;
+    ctx.save();
+    ctx.font = (CELL_SIZE - 4) + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💣', px, py);
     ctx.restore();
   }
 }

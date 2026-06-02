@@ -153,7 +153,7 @@ resizeForMobile();
 
 function startGame() {
   gameOver = false;
-  sharks = [];
+  sharks = []; mines = []; minePlacementMode = false;
   playerKills = [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
   btnEndTurn.disabled = false;
   btnReset.disabled = false;
@@ -231,6 +231,13 @@ canvas.addEventListener('click', function(e) {
     return false;
   });
 
+  // 布雷模式：点击空格布设水雷
+  if (minePlacementMode) {
+    placeMineAt(grid.col, grid.row);
+    updateInfoPanel(); render();
+    return;
+  }
+
   if (clickedShipIndex >= 0) {
     // 无法选中敌方下潜中的舰船
     if (ships[clickedShipIndex].submerged && ships[clickedShipIndex].playerIndex !== currentPlayerIndex) {
@@ -263,6 +270,9 @@ window.addEventListener('keydown', function(e) {
     case 'h': btnGreekFire.click(); break;
     case 't': btnDevour.click(); break;
     case 'y': btnSharks.click(); break;
+    case 'u': btnMine.click(); break;
+    case 'i': btnSupply.click(); break;
+    case 'o': btnAmmo.click(); break;
     default: return;
   }
   e.preventDefault();
@@ -270,6 +280,10 @@ window.addEventListener('keydown', function(e) {
 
 // ── 行动按钮事件 ──
 function mpGuard() {
+  if (mpWaitingForTurnSwitch) {
+    log('正在等待服务器确认回合切换…');
+    return false;
+  }
   if (mpGameStarted && currentPlayerIndex !== mpPlayerIndex) {
     log('现在是对方回合，请等待');
     return false;
@@ -347,9 +361,31 @@ btnSharks.addEventListener('click', function() {
   updateInfoPanel(); render();
 });
 
+btnMine.addEventListener('click', function() {
+  if (!mpGuard()) return;
+  enterMinePlacement();
+  updateInfoPanel(); render();
+});
+
+btnSupply.addEventListener('click', function() {
+  if (!mpGuard()) return;
+  supplyShip();
+  updateInfoPanel(); render();
+});
+
+btnAmmo.addEventListener('click', function() {
+  if (!mpGuard()) return;
+  ammoSupport();
+  updateInfoPanel(); render();
+});
+
 // ── 回合控制 ──
 btnEndTurn.addEventListener('click', function() {
   if (gameOver) return;
+  if (mpWaitingForTurnSwitch) {
+    log('正在等待服务器确认回合切换…');
+    return;
+  }
   if (mpGameStarted && currentPlayerIndex !== mpPlayerIndex) {
     log('现在是对方回合，请等待');
     return;
@@ -358,7 +394,15 @@ btnEndTurn.addEventListener('click', function() {
     log('请等待电脑回合结束');
     return;
   }
-  if (mpGameStarted) sendAction({ type: 'endTurn' });
+  if (mpGameStarted) {
+    if (!sendEndTurn()) {
+      log('[联机] 无法发送消息，请检查网络连接');
+      return;
+    }
+    mpWaitForTurnSwitch();
+    log('已发送结束回合请求，等待服务器确认…');
+    return;
+  }
   switchToNextPlayer();
   if (gameMode === 'ai' && currentPlayerIndex !== 0) {
     setTimeout(function() { aiTakeTurn(); }, 500);
@@ -368,7 +412,7 @@ btnEndTurn.addEventListener('click', function() {
 btnReset.addEventListener('click', function() {
   if (mpGameStarted) { surrenderGame(); return; }
   gameOver = false;
-  sharks = [];
+  sharks = []; mines = []; minePlacementMode = false;
   playerKills = [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
   var vo2 = document.getElementById('victoryOverlay'); vo2.classList.add('hidden'); vo2.style.display = 'none';
   btnEndTurn.disabled = false;
@@ -435,6 +479,21 @@ document.getElementById('btnLibraryBack').addEventListener('click', function() {
   cs.classList.remove('hidden');
   cs.style.display = 'flex';
 });
+
+document.getElementById('btnHelp').addEventListener('click', function() {
+  document.getElementById('helpOverlay').classList.remove('hidden');
+});
+
+// 帮助手册章节切换
+function helpSwitchChapter(ch, el) {
+  var allNav = document.querySelectorAll('.help-nav');
+  for (var hj = 0; hj < allNav.length; hj++) { allNav[hj].classList.remove('active'); }
+  if (el) el.classList.add('active');
+  var secs = document.querySelectorAll('.help-section');
+  for (var hk = 0; hk < secs.length; hk++) { secs[hk].classList.remove('active'); }
+  var sec = document.getElementById('helpSec' + ch);
+  if (sec) sec.classList.add('active');
+}
 
 document.getElementById('btnUnlockOk').addEventListener('click', function() {
   var uo = document.getElementById('unlockOverlay');

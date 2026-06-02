@@ -68,14 +68,46 @@ var famousShipLibrary = [
     skill: "殉爆：被击沉时对周围3×3区域内所有船只造成1点伤害",
     skillData: { deathBlast: true },
     flagColor: '#e67e22', flagShape: 'pennant', flagIcon: 'bang', flagPattern: '#1a1008'
+  },
+  {
+    name: "黄泉号",
+    length: 3,
+    price: 7,
+    skill: "铁甲：船舷每次受到的撞击和舷炮伤害-1，但每回合最多前进2次。一轮舷炮多枚同时命中视作受到一次伤害\n火力增强：舷炮攻击范围+1（射程3格）",
+    skillData: { ironArmor: true, firepowerBoost: true },
+    flagColor: '#2c3e50', flagShape: 'swallowtail', flagIcon: 'cross', flagPattern: '#bdc3c7'
+  },
+  {
+    name: "屠夫号",
+    length: 2,
+    price: 4,
+    skill: "布雷：消耗1行动力，在棋子周围一圈（3×4矩形，共10格）中选择一个空格布下水雷。任何船只以任何位移经过水雷格都会引爆，受到1点伤害。每局可使用3次",
+    skillData: { canLayMines: true, mineCount: 3 },
+    flagColor: '#8b0000', flagShape: 'banner', flagIcon: 'slash', flagPattern: '#ecf0f1'
+  },
+  {
+    name: "舜臣号",
+    length: 1,
+    price: 3,
+    skill: "龟船防御：不携带舷炮，但自身承受的撞击伤害-1",
+    skillData: { turtleShip: true },
+    flagColor: '#1a5c2a', flagShape: 'pennant', flagIcon: 'diamond', flagPattern: '#f0d0a0'
+  },
+  {
+    name: "乌尔卡号",
+    length: 2,
+    price: 5,
+    skill: "补给：消耗1行动力，为与自己船舷接触的一艘友方舰船回复1点生命，每局可使用3次\n弹药支援：自身舷炮未耗尽时可用，消耗1行动力，为与自己船舷接触的一艘友方舰船补充一次舷炮",
+    skillData: { canSupply: true, supplyCount: 3 },
+    flagColor: '#1a6e6e', flagShape: 'banner', flagIcon: 'cross', flagPattern: '#ecf0f1'
   }
 ];
 
 // ── 当前对局的名船选择 ──
 var activeGamePicks = { red: [], blue: [] };
 
-// ── 全局洗牌结果（确保红蓝双方无重叠） ──
-var shuffledFamousLibrary = [];
+// ── 红方已选名船（蓝方不可重复） ──
+var redSelectedFamousNames = [];
 
 // ── 选船临时状态 ──
 var shipSelectionState = {
@@ -100,7 +132,8 @@ function getDefaultFleet() {
 
 // ── 为玩家生成 9 个随机船只选项 ──
 function generateShipOptions() {
-  var famousPool = shipSelectionState.famousPool.slice(); // 每次刷新使用全新副本
+  // 每次刷新重新洗牌，保证名船多样性
+  var famousPool = shipSelectionState.famousPool.slice().sort(function() { return Math.random() - 0.5; });
   var options = [];
   var normalId = 1;
 
@@ -173,21 +206,21 @@ function refreshShipOptions() {
 
 // ── 入口：开始选船流程 ──
 function startShipSelection(playerIndex) {
-  // 红方时洗牌名船库，平分给双方
-  if (playerIndex === 0) {
-    shuffledFamousLibrary = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
-  }
-  var half = Math.ceil(shuffledFamousLibrary.length / 2);
-  var famousPool = playerIndex === 0
-    ? shuffledFamousLibrary.slice(0, half)
-    : shuffledFamousLibrary.slice(half);
-
   shipSelectionState.currentPlayer = playerIndex;
   shipSelectionState.gold = 15;
   shipSelectionState.selectedIndices = [];
-  shipSelectionState.famousPool = famousPool;
-  shipSelectionState.availableShips = generateShipOptions();
 
+  // 红方可选全体名船，蓝方排除红方已选
+  var allFamous = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
+  if (playerIndex === 0) {
+    redSelectedFamousNames = [];
+    shipSelectionState.famousPool = allFamous;
+  } else {
+    shipSelectionState.famousPool = allFamous.filter(function(s) {
+      return redSelectedFamousNames.indexOf(s.name) < 0;
+    });
+  }
+  shipSelectionState.availableShips = generateShipOptions();
   showSelectionOverlay();
 }
 
@@ -225,6 +258,7 @@ function confirmSelection() {
 
   if (shipSelectionState.currentPlayer === 0) {
     shipSelectionState.redPicks = picks;
+    redSelectedFamousNames = picks.filter(function(p) { return p.isFamous; }).map(function(p) { return p.name; });
     if (inCampaign) {
       // 关卡模式：直接开始战斗（AI舰队已预设）
       hideSelectionOverlay();
@@ -248,6 +282,7 @@ function skipSelection() {
 
   if (shipSelectionState.currentPlayer === 0) {
     shipSelectionState.redPicks = picks;
+    redSelectedFamousNames = picks.filter(function(p) { return p.isFamous; }).map(function(p) { return p.name; });
     if (inCampaign) {
       hideSelectionOverlay();
       menuScreen.classList.add('hidden');
