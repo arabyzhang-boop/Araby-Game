@@ -20,8 +20,10 @@ function afterShipAction(ship, actionDesc, cost) {
   clearBrokenBoarding(); // 移动/转向后清理不再接触的接舷关系
 
   if (ship.actionsRemaining <= 0) {
-    selectedShipIndex = -1;
-    log(`舰船行动力耗尽，已取消选中`);
+    if (!mpRemoteExec) {
+      selectedShipIndex = -1;
+      log(`舰船行动力耗尽，已取消选中`);
+    }
   }
 
   checkDevourContacts();
@@ -41,8 +43,12 @@ function afterShipAction(ship, actionDesc, cost) {
         setTimeout(function() { aiTakeTurn(); }, 500);
       }
     }
-  } else {
+  } else if (!mpRemoteExec) {
+    // 远程执行时不刷新信息面板，避免干扰本地玩家的选中状态
     updateInfoPanel();
+    render();
+  } else {
+    // 远程执行：只刷新棋盘，不动面板
     render();
   }
 }

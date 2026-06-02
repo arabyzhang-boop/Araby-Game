@@ -585,6 +585,7 @@ var mpRemoteExec = false; // 远程执行中标志
 function applyRemoteAction(action) {
   mpRemoteExec = true;
   var savedPlayer = currentPlayerIndex;
+  var savedSelection = selectedShipIndex; // 保存本地玩家的选中状态
   currentPlayerIndex = action.playerIndex != null ? action.playerIndex : (1 - mpPlayerIndex);
 
   // 对方结束回合：兼容旧版代码（endTurn 通过 action 中继）和自动耗尽场景
@@ -593,7 +594,7 @@ function applyRemoteAction(action) {
     clearTimeout(mpTurnSwitchTimer);
     switchToNextPlayer();
     mpRemoteExec = false;
-    selectedShipIndex = -1;
+    selectedShipIndex = savedSelection;
     btnEndTurn.disabled = false;
     render();
     return;
@@ -617,8 +618,8 @@ function applyRemoteAction(action) {
   }
   currentPlayerIndex = savedPlayer;
   mpRemoteExec = false;
-  selectedShipIndex = -1;
-  // 仅刷新棋盘，不动面板（避免屏幕抖动）
+  selectedShipIndex = savedSelection; // 恢复本地玩家的选中状态
+  // 刷新棋盘但不动信息面板
   render();
 }
 
