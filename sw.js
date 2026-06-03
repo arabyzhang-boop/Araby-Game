@@ -22,7 +22,7 @@ const PRECACHE_FILES = [
   'manifest.json'
 ];
 
-// 安装：预缓存所有静态资源（不立即 skipWaiting，等用户确认更新）
+// 安装：预缓存所有静态资源，完成后立即激活（使 GA 等关键修复即时生效）
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -31,6 +31,7 @@ self.addEventListener('install', function(event) {
       });
     })
   );
+  self.skipWaiting();
 });
 
 // 接收主页面消息

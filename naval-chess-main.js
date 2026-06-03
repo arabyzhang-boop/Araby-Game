@@ -504,40 +504,25 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
 
 // ── PWA 版本更新检测 ──
 (function() {
-  // 在菜单角落显示版本号
+  // 左下角版本号（提高可见性）
   var verEl = document.createElement('div');
   verEl.id = 'appVersion';
   verEl.textContent = 'v' + APP_VERSION;
-  verEl.style.cssText = 'position:fixed;bottom:8px;left:12px;font-size:10px;color:rgba(255,255,255,0.35);z-index:200;font-family:monospace;pointer-events:none;';
+  verEl.style.cssText = 'position:fixed;bottom:6px;left:10px;font-size:11px;color:rgba(255,255,255,0.55);z-index:9999;font-family:monospace;pointer-events:none;text-shadow:0 0 4px rgba(0,0,0,0.6);';
   document.body.appendChild(verEl);
 
   if (!('serviceWorker' in navigator)) return;
 
-  // 检测 SW 更新（处理竞态条件：updatefound 可能在 ready 回调前已触发）
-  function watchWorker(newWorker) {
-    if (!newWorker) return;
-    newWorker.onstatechange = function() {
-      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        showUpdateToast();
-      }
-    };
-    // 如果回调时已处于 installed 状态，立即触发
-    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-      showUpdateToast();
-    }
-  }
+  // SW 激活/接管时触发更新提示
+  var firstController = navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    // 页面首次加载时也会触发 controllerchange（SW 首次接管），跳过
+    if (!firstController) { firstController = navigator.serviceWorker.controller; return; }
+    showUpdateToast();
+  });
 
+  // 每 20 分钟主动检查更新
   navigator.serviceWorker.ready.then(function(reg) {
-    // 先检查是否已有正在安装/等待的 SW（可能在 ready 之前就触发了）
-    if (reg.installing) watchWorker(reg.installing);
-    if (reg.waiting && navigator.serviceWorker.controller) showUpdateToast();
-
-    // 再监听未来的更新
-    reg.onupdatefound = function() {
-      watchWorker(reg.installing);
-    };
-
-    // 每 20 分钟主动检查一次更新（浏览器默认约24小时才检查）
     setInterval(function() {
       reg.update().catch(function(){});
     }, 20 * 60 * 1000);
@@ -551,22 +536,7 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
     document.body.appendChild(toast);
 
     document.getElementById('btnUpdateRefresh').addEventListener('click', function() {
-      navigator.serviceWorker.ready.then(function(reg) {
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
-      });
-      // 监听新 SW 接管后刷新
-      var refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', function() {
-        if (refreshing) return;
-        refreshing = true;
-        window.location.reload();
-      });
-      // 兜底：2 秒后强制刷新
-      setTimeout(function() {
-        if (!refreshing) { refreshing = true; window.location.reload(); }
-      }, 2000);
+      window.location.reload();
     });
   }
 })();
