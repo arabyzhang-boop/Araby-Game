@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#3e2723">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Naval Chess">
+<link rel="apple-touch-icon" href="Naval%20Chess%20Logo%20tiny.png">
+<link rel="manifest" href="manifest.json">
 <title>Naval Chess：航海棋</title>
-<link rel="stylesheet" href="naval-chess-styles.css?v=4">
+<link rel="stylesheet" href="naval-chess-styles.css?v=7">
 </head>
 <body>
 
@@ -78,6 +84,20 @@
       <button class="selection-btn skip" id="btnCampaignBack">返回</button>
       <button class="selection-btn refresh" id="btnOpenLibrary">名船库</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══ 名船详情弹窗 ═══ -->
+<div class="ship-detail-overlay hidden" id="shipDetailOverlay">
+  <div class="ship-detail-card">
+    <div class="ship-detail-flag" id="detailFlag"></div>
+    <div class="ship-detail-name" id="detailName"></div>
+    <div class="selection-divider"></div>
+    <div class="ship-detail-type" id="detailType"></div>
+    <div class="ship-detail-price" id="detailPrice"></div>
+    <div class="ship-detail-divider"></div>
+    <div class="ship-detail-skill" id="detailSkill"></div>
+    <button class="selection-btn confirm" id="btnDetailClose">收起</button>
   </div>
 </div>
 
@@ -295,18 +315,18 @@
 </div>
 
 <!-- Scripts 按依赖顺序加载 -->
-<script src="naval-chess-config.js?v=4"></script>
-<script src="naval-chess-utils.js?v=4"></script>
-<script src="naval-chess-render.js?v=4"></script>
-<script src="naval-chess-ui.js?v=4"></script>
-<script src="naval-chess-combat.js?v=4"></script>
-<script src="naval-chess-actions.js?v=4"></script>
-<script src="naval-chess-fleet.js?v=4"></script>
-<script src="naval-chess-famous-ships.js?v=4"></script>
-<script src="naval-chess-ai.js?v=4"></script>
-<script src="naval-chess-campaign.js?v=4"></script>
-<script src="naval-chess-multiplayer.js?v=4"></script>
-<script src="naval-chess-main.js?v=4"></script>
+<script src="naval-chess-config.js?v=7"></script>
+<script src="naval-chess-utils.js?v=7"></script>
+<script src="naval-chess-render.js?v=7"></script>
+<script src="naval-chess-ui.js?v=7"></script>
+<script src="naval-chess-combat.js?v=7"></script>
+<script src="naval-chess-actions.js?v=7"></script>
+<script src="naval-chess-fleet.js?v=7"></script>
+<script src="naval-chess-famous-ships.js?v=7"></script>
+<script src="naval-chess-ai.js?v=7"></script>
+<script src="naval-chess-campaign.js?v=7"></script>
+<script src="naval-chess-multiplayer.js?v=7"></script>
+<script src="naval-chess-main.js?v=7"></script>
 
 <!-- ═══ 帮助窗口 ═══ -->
 <div class="help-overlay hidden" id="helpOverlay">
@@ -379,5 +399,14 @@
   </div>
 </div>
 
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(function() {
+    console.log('[PWA] Service Worker 已注册');
+  }).catch(function(err) {
+    console.log('[PWA] Service Worker 注册失败:', err);
+  });
+}
+</script>
 </body>
 </html>

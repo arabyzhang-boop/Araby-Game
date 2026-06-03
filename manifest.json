@@ -1,0 +1,30 @@
+{
+  "name": "Naval Chess — 航海棋",
+  "short_name": "Naval Chess",
+  "description": "Age of Sail · 1500–1700 风帆时代海战棋类游戏",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#d9c8a8",
+  "theme_color": "#3e2723",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "Naval%20Chess%20Logo%20tiny.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "Naval%20Chess%20Logo%20tiny.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "Naval%20Chess%20Logo%20tiny.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

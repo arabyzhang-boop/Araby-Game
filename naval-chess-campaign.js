@@ -239,21 +239,50 @@ function updateLibraryDisplay() {
   for (var i = 0; i < famousShipLibrary.length; i++) {
     var ship = famousShipLibrary[i];
     var unlocked = campaignUnlockedShips.indexOf(i) >= 0;
-    html += '<div class="library-ship' + (unlocked ? ' unlocked' : ' locked') + '">';
     if (unlocked) {
       var typeNames = { 1: '小型舰船', 2: '中型舰船', 3: '大型舰船' };
+      html += '<button class="lib-ship-btn" onclick="showShipDetail(' + i + ')">';
       html += '<div class="lib-ship-flag">' + getFlagSVG(ship) + '</div>';
       html += '<div class="lib-ship-name">' + ship.name + '</div>';
-      html += '<div class="lib-ship-type">' + typeNames[ship.length] + ' · ' + ship.price + ' 费</div>';
-      html += '<div class="lib-ship-skill">' + ship.skill.replace(/\n/g, '<br>') + '</div>';
+      html += '<div class="lib-ship-type">' + typeNames[ship.length] + '</div>';
+      html += '</button>';
     } else {
+      html += '<div class="library-ship locked">';
       html += '<div class="lib-ship-icon">?</div>';
       html += '<div class="lib-ship-name">???</div>';
+      html += '</div>';
     }
-    html += '</div>';
   }
   grid.innerHTML = html;
 }
+
+// ── 名船详情弹窗 ──
+function showShipDetail(shipIndex) {
+  var ship = famousShipLibrary[shipIndex];
+  if (!ship) return;
+  var typeNames = { 1: '小型舰船', 2: '中型舰船', 3: '大型舰船' };
+  document.getElementById('detailFlag').innerHTML = getFlagSVG(ship);
+  document.getElementById('detailName').textContent = ship.name;
+  document.getElementById('detailType').textContent = typeNames[ship.length];
+  document.getElementById('detailPrice').textContent = ship.price + ' 费';
+  document.getElementById('detailSkill').innerHTML = ship.skill.replace(/\n/g, '<br>');
+  var overlay = document.getElementById('shipDetailOverlay');
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+}
+
+function hideShipDetail() {
+  var overlay = document.getElementById('shipDetailOverlay');
+  overlay.classList.add('hidden');
+  overlay.style.display = 'none';
+}
+
+document.getElementById('btnDetailClose').addEventListener('click', hideShipDetail);
+
+// 点击遮罩背景关闭
+document.getElementById('shipDetailOverlay').addEventListener('click', function(e) {
+  if (e.target === this) hideShipDetail();
+});
 
 // ── 绑定关卡按钮 ──
 for (var li = 0; li < campaignLevels.length; li++) {

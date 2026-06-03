@@ -206,7 +206,13 @@ function fireBroadside() {
           }
           if (!hits.some(function(h) { return h.shipIdx === hitIdx && h.col === tc && h.row === tr; })) {
             const isFriendly = ships[hitIdx].playerIndex === ship.playerIndex;
-            hits.push({ shipIdx: hitIdx, col: tc, row: tr, isFriendly: isFriendly, range: r });
+            // 铁甲判定：炮弹方向垂直于铁甲舰方向→命中船舷；平行→命中船头/船尾，铁甲不生效
+            var hitsBroadside = true;
+            if (hitShip.skillData && hitShip.skillData.ironArmor) {
+              var ironcladDv = DIR_VECTORS[hitShip.direction];
+              hitsBroadside = (sd.dx * ironcladDv.dx + sd.dy * ironcladDv.dy === 0);
+            }
+            hits.push({ shipIdx: hitIdx, col: tc, row: tr, isFriendly: isFriendly, range: r, hitsBroadside: hitsBroadside });
             if (!isFriendly && r === 1) {
               const cellKey = `${ox},${oy}`;
               if (!contactedCells.has(cellKey)) {
@@ -237,14 +243,14 @@ function fireBroadside() {
     }
   }
 
-  // 铁甲：每轮舷炮多枚命中视作1次，总伤害-1（至少1点）
+  // 铁甲：每轮舷炮中命中船舷的多枚视作1次，总伤害-1（至少1点）；命中船头/船尾不触发减伤
   var ironArmorHits = {};
   for (const hit of hits) {
     ships[hit.shipIdx].hp--;
     addHitEffect(hit.col, hit.row);
     const tag = hit.isFriendly ? '友军' : '敌军';
     log(`炮弹命中${tag}${shipName(hit.shipIdx)}，造成 1 点伤害（剩余 ${ships[hit.shipIdx].hp} HP）`);
-    if (ships[hit.shipIdx].skillData && ships[hit.shipIdx].skillData.ironArmor) {
+    if (ships[hit.shipIdx].skillData && ships[hit.shipIdx].skillData.ironArmor && hit.hitsBroadside) {
       ironArmorHits[hit.shipIdx] = (ironArmorHits[hit.shipIdx] || 0) + 1;
     }
   }

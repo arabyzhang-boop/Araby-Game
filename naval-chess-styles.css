@@ -456,8 +456,13 @@
     .ship-pick-name { font-size: 13px; }
     .ship-pick-price { font-size: 12px; }
     .campaign-card, .library-card { padding: 16px 12px; max-width: 98vw; }
-    .campaign-grid, .library-grid { gap: 6px; }
+    .campaign-grid, .library-grid { gap: 5px; }
     .campaign-level { font-size: 12px; padding: 12px 6px; }
+    .lib-ship-btn { padding: 10px 6px; }
+    .lib-ship-name { font-size: 11px; letter-spacing: 0.5px; }
+    .lib-ship-flag svg { width: 22px; height: 18px; }
+    .ship-detail-card { padding: 20px 16px; max-width: 88vw; }
+    .ship-detail-name { font-size: 24px; }
     .victory-card { padding: 20px 20px; min-width: auto; max-width: 92vw; }
     .victory-title { font-size: 26px; }
     .unlock-card { max-width: 90vw; padding: 20px; }
@@ -1099,27 +1104,14 @@
   margin-bottom: 20px;
 }
 
-.library-ship {
-  background: rgba(255,255,255,0.25);
+/* 未解锁：保留占位样式 */
+.library-ship.locked {
+  background: rgba(255,255,255,0.15);
   border: 2px solid #8d6e63;
   border-radius: 8px;
   padding: 14px 10px;
   text-align: center;
-  transition: all 0.2s;
-}
-
-.library-ship.unlocked {
-  border-color: var(--gold);
-  background: rgba(201,169,78,0.15);
-  cursor: pointer;
-}
-.library-ship.unlocked:hover {
-  background: rgba(201,169,78,0.3);
-  border-color: var(--gold-light);
-}
-
-.library-ship.locked {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .lib-ship-icon {
@@ -1128,27 +1120,145 @@
   color: #5d4037;
 }
 
+/* 已解锁：紧凑按钮 */
+.lib-ship-btn {
+  font-family: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(201,169,78,0.18) 100%);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  padding: 12px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 0 rgba(139,90,40,0.3), 0 3px 8px rgba(0,0,0,0.15);
+  position: relative;
+}
+.lib-ship-btn::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px solid rgba(139,90,40,0.15);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.lib-ship-btn:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(201,169,78,0.3) 100%);
+  border-color: var(--gold-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 rgba(139,90,40,0.35), 0 6px 14px rgba(0,0,0,0.25);
+}
+.lib-ship-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(139,90,40,0.3), 0 2px 4px rgba(0,0,0,0.15);
+  transition: all 0.05s ease;
+}
+
 .lib-ship-flag {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 .lib-ship-flag svg {
-  width: 26px;
-  height: 20px;
+  width: 28px;
+  height: 22px;
 }
 
 .lib-ship-name {
   font-family: 'IM Fell English SC', serif;
-  font-size: 13px;
+  font-size: 14px;
   color: #3e2723;
-  letter-spacing: 1px;
+  letter-spacing: 1.5px;
 }
 
-.lib-ship-skill {
-  font-family: 'IM Fell English', serif;
+.lib-ship-type {
   font-size: 10px;
+  color: #8b6914;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* ═══ 名船详情弹窗 ═══ */
+.ship-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 130;
+  animation: fadeIn 0.2s ease;
+}
+.ship-detail-overlay.hidden { display: none; }
+
+.ship-detail-card {
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  border: 4px solid #5d4037;
+  border-radius: 12px;
+  padding: 28px 34px;
+  text-align: center;
+  max-width: 360px;
+  width: 88%;
+  box-shadow:
+    inset 0 0 0 2px rgba(139,90,40,0.15),
+    0 12px 42px rgba(0,0,0,0.55),
+    0 0 60px rgba(201,169,78,0.15);
+  position: relative;
+}
+.ship-detail-card::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(139,90,40,0.15);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.ship-detail-flag {
+  margin-bottom: 8px;
+}
+.ship-detail-flag svg {
+  width: 44px;
+  height: 34px;
+}
+
+.ship-detail-name {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 28px;
+  color: #3e2723;
+  letter-spacing: 3px;
+  margin-bottom: 6px;
+}
+
+.ship-detail-type {
+  font-family: 'IM Fell English', serif;
+  font-size: 15px;
   color: #795548;
-  margin-top: 3px;
-  line-height: 1.3;
+}
+
+.ship-detail-price {
+  font-family: 'IM Fell English', serif;
+  font-size: 18px;
+  color: #b8860b;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+.ship-detail-divider {
+  width: 40%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(139,90,40,0.4), transparent);
+  margin: 12px auto;
+}
+
+.ship-detail-skill {
+  font-family: 'IM Fell English', serif;
+  font-size: 14px;
+  color: #5d4037;
+  line-height: 1.6;
+  text-align: left;
+  margin-bottom: 18px;
+  padding: 8px 12px;
+  background: rgba(139,90,40,0.08);
+  border-radius: 4px;
+  border-left: 3px solid var(--gold);
 }
 
 /* ═══ 关卡通关解锁提示 ═══ */
