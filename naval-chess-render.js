@@ -92,17 +92,23 @@ function drawShip(ship) {
       ctx.fillRect(px + pad + 2, barY, barW * hpRatio, barH);
     }
 
-    // 未开炮标记（船尾格右下角金色小圆点）
-    if (i === 0 && ship.broadsideCount < ship.maxBroadsideCount) {
-      const dotX = px + CELL_SIZE - pad - 5;
-      const dotY = py + CELL_SIZE - pad - 5;
-      ctx.fillStyle = '#e6c96a';
-      ctx.beginPath();
-      ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#8b6914';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+    // 舷炮剩余次数标记（船尾格右下角金色小圆点，每点=1次）
+    var remainingShots = ship.maxBroadsideCount - ship.broadsideCount;
+    if (i === 0 && remainingShots > 0) {
+      var dotR = remainingShots > 1 ? 2.2 : 3;
+      var baseX = px + CELL_SIZE - pad - 4;
+      var baseY = py + CELL_SIZE - pad - 4;
+      for (var di = 0; di < remainingShots; di++) {
+        var dotX = baseX - di * 6;
+        var dotY = baseY;
+        ctx.fillStyle = '#e6c96a';
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#8b6914';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
     }
 
     // 船头三角形（i = length-1 为船头）

@@ -80,11 +80,13 @@ function moveShipForward() {
     }
   }
 
-  // 检查终点格：下潜可穿过中途舰船但不允许终点重叠
-  for (const c of newCells) {
-    if (isCellOccupied(c.col, c.row, selectedShipIndex)) {
-      log(`无法前进：前方有舰船阻挡`);
-      return false;
+  // 下潜时可穿过/重叠任何舰船
+  if (!ship.submerged) {
+    for (const c of newCells) {
+      if (isCellOccupied(c.col, c.row, selectedShipIndex)) {
+        log(`无法前进：前方有舰船阻挡`);
+        return false;
+      }
     }
   }
 
