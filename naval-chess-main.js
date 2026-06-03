@@ -276,8 +276,6 @@ canvas.addEventListener('click', function(e) {
       return;
     }
     selectedShipIndex = clickedShipIndex;
-    const ship = ships[selectedShipIndex];
-    log(`选中 ${['葡萄牙帝国','荷兰东印度公司'][ship.playerIndex]} 的${shipName(selectedShipIndex)}`);
   } else {
     selectedShipIndex = -1;
   }

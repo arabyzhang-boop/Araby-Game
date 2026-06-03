@@ -103,6 +103,7 @@ server.on('connection', (ws) => {
     msgCount++;
     if (msgCount <= 5) console.log(`>>> 收到消息 #${msgCount}: type=${msg.type}`);
 
+    try {
     switch (msg.type) {
 
       // ── 创建房间 ──
@@ -297,6 +298,9 @@ server.on('connection', (ws) => {
         if (msgCount <= 5) console.log(`>>> 未知消息类型: type=${msg.type}`);
         break;
     }
+    } catch (err) {
+      console.log('>>> 消息处理异常:', err.message, err.stack && err.stack.slice(0, 200));
+    }
   });
 
   // ── 断线处理 ──
@@ -321,7 +325,7 @@ server.on('connection', (ws) => {
   });
 });
 
-// ── 心跳检测（每30秒） ──
+// ── 心跳检测（每18秒，确保 Render 负载均衡器不判定空闲断开） ──
 const heartbeat = setInterval(() => {
   server.clients.forEach((ws) => {
     if (ws.isAlive === false) {
@@ -331,7 +335,7 @@ const heartbeat = setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   });
-}, 30000);
+}, 18000);
 
 server.on('close', () => clearInterval(heartbeat));
 

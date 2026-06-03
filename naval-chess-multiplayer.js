@@ -76,6 +76,20 @@ function mpStatus(msg, isError) {
   }
 }
 
+// ── 回合切换通知 ──
+function mpShowTurnNotification() {
+  var existing = document.getElementById('turnNotification');
+  if (existing) existing.remove();
+  var toast = document.createElement('div');
+  toast.id = 'turnNotification';
+  toast.className = 'turn-notification';
+  toast.textContent = '对方回合结束，轮到你的回合';
+  document.body.appendChild(toast);
+  setTimeout(function() {
+    if (toast.parentNode) toast.remove();
+  }, 2200);
+}
+
 // ── WebSocket ──
 function mpConnect() {
   if (mpSocket) { mpSocket.close(); }
@@ -89,13 +103,13 @@ function mpConnect() {
       mpSocket.send(JSON.stringify(mpPendingSend));
       mpPendingSend = null;
     }
-    // 启动心跳（每25秒发送ping，服务器30秒超时检测）
+    // 启动心跳（每12秒发送ping，防止 Render/负载均衡器空闲断开）
     clearInterval(mpPingTimer);
     mpPingTimer = setInterval(function() {
       if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
         mpSocket.send(JSON.stringify({ type: 'ping' }));
       }
-    }, 25000);
+    }, 12000);
   };
   mpSocket.onmessage = function(e) {
     try {
@@ -193,7 +207,11 @@ function handleServerMessage(msg) {
         btnEndTurn.disabled = false;
         updateInfoPanel();
         render();
-        log((mpPlayerIndex === currentPlayerIndex ? '轮到你的回合' : '对方回合，请等待'));
+        if (mpPlayerIndex === currentPlayerIndex) {
+          mpShowTurnNotification();
+        } else {
+          log('对方回合，请等待');
+        }
       }
       break;
 
@@ -299,7 +317,14 @@ function mpShowSelection(playerIdx, options) {
   shipSelectionState.gold = 15;
   shipSelectionState.selectedIndices = [];
   shipSelectionState.availableShips = options;
-  shipSelectionState.famousPool = [];
+  // 设置正确的名船池以便刷新时重新生成选项
+  if (playerIdx === 0) {
+    shipSelectionState.famousPool = famousShipLibrary.slice().sort(function() { return Math.random() - 0.5; });
+  } else {
+    shipSelectionState.famousPool = famousShipLibrary.slice().filter(function(s) {
+      return redSelectedFamousNames.indexOf(s.name) < 0;
+    });
+  }
 
   var isMyTurn = (playerIdx === mpPlayerIndex);
 
@@ -440,9 +465,11 @@ function mpApplySelectionUpdate(msg) {
 
 function mpHandleSelectionConfirmed(msg) {
   if (msg.playerIdx === 0) {
-    // 红方确认：客机显示蓝方选船
+    // 红方确认：双方都要记录红方选中的名船，以便蓝方刷新时正确排除
+    shipSelectionState.redPicks = msg.picks;
+    redSelectedFamousNames = msg.picks.filter(function(p) { return p.isFamous; }).map(function(p) { return p.name; });
+    // 客机显示蓝方选船
     if (mpPlayerIndex !== 0) {
-      shipSelectionState.redPicks = msg.picks;
       if (mpSavedBlueOptions) {
         mpShowSelection(1, mpSavedBlueOptions);
       }
@@ -596,6 +623,9 @@ function applyRemoteAction(action) {
     mpRemoteExec = false;
     selectedShipIndex = savedSelection;
     btnEndTurn.disabled = false;
+    if (mpPlayerIndex === currentPlayerIndex) {
+      mpShowTurnNotification();
+    }
     render();
     return;
   }
@@ -627,8 +657,10 @@ function applyRemoteAction(action) {
 function surrenderGame() {
   if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
     mpSocket.send(JSON.stringify({ type: 'surrender' }));
+    mpEndGame('你已投降，对方获得胜利');
+  } else {
+    mpEndGame('连接已断开，游戏终止');
   }
-  mpEndGame('你已投降，对方获得胜利');
 }
 
 function mpEndGame(msg) {
@@ -663,8 +695,17 @@ function cleanupMultiplayer() {
 createMultiplayerUI();
 mpInstallSelectionHooks();
 
+function mpResetMenuState() {
+  document.getElementById('mpModeSelect').classList.add('hidden');
+  document.getElementById('btnMpHost').style.display = '';
+  document.getElementById('btnMpJoin').style.display = '';
+  var input = document.querySelector('#mpMenuScreen .mp-room-input');
+  if (input) input.style.display = '';
+}
+
 document.getElementById('btnMulti').addEventListener('click', function() {
   mpConnect();
+  mpResetMenuState();
   menuScreen.classList.add('hidden');
   mpMenuScreen.classList.remove('hidden');
   mpMenuScreen.style.display = 'flex';
@@ -710,6 +751,12 @@ document.getElementById('btnMpJoin').addEventListener('click', function() {
 });
 
 document.getElementById('btnMpBack').addEventListener('click', function() {
+  // 如果在模式选择子页面，只返回到联机主页面
+  var modeSelect = document.getElementById('mpModeSelect');
+  if (!modeSelect.classList.contains('hidden')) {
+    mpResetMenuState();
+    return;
+  }
   cleanupMultiplayer();
   mpMenuScreen.classList.add('hidden');
   mpMenuScreen.style.display = 'none';
@@ -720,5 +767,7 @@ document.getElementById('btnMpCancel').addEventListener('click', function() {
   cleanupMultiplayer();
   mpWaitingScreen.classList.add('hidden');
   mpWaitingScreen.style.display = 'none';
-  menuScreen.classList.remove('hidden');
+  mpResetMenuState();
+  mpMenuScreen.classList.remove('hidden');
+  mpMenuScreen.style.display = 'flex';
 });
