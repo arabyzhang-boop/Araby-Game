@@ -324,13 +324,22 @@
     min-width: 44px;
     padding: 10px 2px;
   }
-  .btn-music:hover {
+  .btn-music:hover:not(:disabled) {
     background: linear-gradient(180deg, #5a8a45 0%, #3d5e2a 100%);
     color: #e0f0c0;
   }
   .btn-music.muted {
     background: linear-gradient(180deg, #6b4a3b 0%, #4a2d1e 100%);
     color: #c0a090;
+  }
+  .btn-music:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    animation: pulse-loading 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-loading {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.75; }
   }
 
   /* ── 消息日志 ── */
@@ -1316,4 +1325,51 @@
   line-height: 1.5;
   margin-bottom: 16px;
   opacity: 0.85;
+}
+
+/* ═══ PWA 版本更新提示 ═══ */
+#updateToast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  background: linear-gradient(180deg, #3e2723 0%, #2a1810 100%);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 0 16px rgba(201,169,78,0.25);
+  font-family: 'IM Fell English', serif;
+  font-size: 14px;
+  color: var(--parchment);
+  animation: slideUp 0.35s ease;
+  white-space: nowrap;
+}
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(80px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+#btnUpdateRefresh {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 100%);
+  border: 2px solid #8b6914;
+  border-radius: 4px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+#btnUpdateRefresh:hover {
+  background: linear-gradient(180deg, #f0d878 0%, var(--gold-light) 100%);
+  transform: scale(1.04);
+}
+#btnUpdateRefresh:active {
+  transform: scale(0.96);
 }

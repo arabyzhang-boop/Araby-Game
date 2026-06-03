@@ -165,10 +165,17 @@ function startGame() {
 
 // ── 背景音乐控制 ──
 function updateMusicButton() {
+  if (!musicLoaded) {
+    btnMusic.textContent = '⏳ 加载中';
+    btnMusic.classList.add('muted');
+    btnMusic.disabled = true;
+    return;
+  }
+  btnMusic.disabled = false;
   if (musicOn) {
     btnMusic.textContent = '🔊 音乐';
     btnMusic.classList.remove('muted');
-    bgm.play().catch(function() {});
+    if (bgm.paused) bgm.play().catch(function(){});
   } else {
     btnMusic.textContent = '🔇 静音';
     btnMusic.classList.add('muted');
@@ -176,13 +183,37 @@ function updateMusicButton() {
   }
 }
 
+// 音频缓冲足够即开始播放（canplay 在几秒内触发，不等整个文件下载完）
+bgm.addEventListener('canplay', function() {
+  if (musicLoaded) return;
+  musicLoaded = true;
+  updateMusicButton();
+  if (musicOn) {
+    bgm.play().then(function() {
+      console.log('[BGM] 开始播放');
+    }).catch(function() {
+      // 浏览器自动播放策略阻止，等用户首次交互
+      console.log('[BGM] 等待用户交互');
+    });
+  }
+});
+
+// 显示加载进度
+bgm.addEventListener('progress', function() {
+  if (!musicLoaded && bgm.buffered.length > 0) {
+    var pct = Math.round(bgm.buffered.end(0) / bgm.duration * 100);
+    if (pct > 0) btnMusic.textContent = '⏳ ' + pct + '%';
+  }
+});
+
 btnMusic.addEventListener('click', function() {
+  if (!musicLoaded) return;
   musicOn = !musicOn;
   updateMusicButton();
 });
 
 function tryStartBgm() {
-  if (musicOn && bgm.paused) {
+  if (musicLoaded && musicOn && bgm.paused) {
     bgm.play().catch(function() {});
   }
   document.removeEventListener('click', tryStartBgm);
@@ -470,6 +501,66 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
   ls.classList.remove('hidden');
   ls.style.display = 'flex';
 });
+
+// ── PWA 版本更新检测 ──
+(function() {
+  // 在菜单角落显示版本号
+  var verEl = document.createElement('div');
+  verEl.id = 'appVersion';
+  verEl.textContent = 'v' + APP_VERSION;
+  verEl.style.cssText = 'position:fixed;bottom:8px;left:12px;font-size:10px;color:rgba(255,255,255,0.35);z-index:200;font-family:monospace;pointer-events:none;';
+  document.body.appendChild(verEl);
+
+  if (!('serviceWorker' in navigator)) return;
+
+  // 检测 SW 更新
+  navigator.serviceWorker.ready.then(function(reg) {
+    reg.onupdatefound = function() {
+      var newWorker = reg.installing;
+      if (!newWorker) return;
+      newWorker.onstatechange = function() {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateToast();
+        }
+      };
+    };
+    if (reg.waiting && navigator.serviceWorker.controller) {
+      showUpdateToast();
+    }
+
+    // 每 20 分钟主动检查一次更新（浏览器默认约24小时才检查）
+    setInterval(function() {
+      reg.update().catch(function(){});
+    }, 20 * 60 * 1000);
+  });
+
+  function showUpdateToast() {
+    if (document.getElementById('updateToast')) return;
+    var toast = document.createElement('div');
+    toast.id = 'updateToast';
+    toast.innerHTML = '<span>检测到新版本可用</span><button id="btnUpdateRefresh">🔄 刷新更新</button>';
+    document.body.appendChild(toast);
+
+    document.getElementById('btnUpdateRefresh').addEventListener('click', function() {
+      navigator.serviceWorker.ready.then(function(reg) {
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+      // 监听新 SW 接管后刷新
+      var refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (refreshing) return;
+        refreshing = true;
+        window.location.reload();
+      });
+      // 兜底：2 秒后强制刷新
+      setTimeout(function() {
+        if (!refreshing) { refreshing = true; window.location.reload(); }
+      }, 2000);
+    });
+  }
+})();
 
 document.getElementById('btnLibraryBack').addEventListener('click', function() {
   var ls = document.getElementById('libraryScreen');

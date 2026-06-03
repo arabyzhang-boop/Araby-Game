@@ -3,6 +3,9 @@
 //  加载顺序：第1个（无依赖）
 // ═══════════════════════════════════════
 
+// 更新版本时请修改此版本号（格式: YYMMDD-N）
+var APP_VERSION = '250603-1';
+
 // ── 菜单控制 ──
 var gameMode = 'pvp'; // 'pvp' | 'ai'
 var gameSpeed = 'classic'; // 'classic' | 'speed'
@@ -74,6 +77,7 @@ var bgm             = document.getElementById('bgm');
 
 // ── 音乐 ──
 var musicOn = true;
+var musicLoaded = false;
 bgm.volume = 0.3;
 
 // ── 命中特效 ──

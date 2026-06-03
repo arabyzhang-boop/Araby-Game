@@ -22,7 +22,7 @@ const PRECACHE_FILES = [
   'manifest.json'
 ];
 
-// 安装：预缓存所有静态资源
+// 安装：预缓存所有静态资源（不立即 skipWaiting，等用户确认更新）
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -31,7 +31,13 @@ self.addEventListener('install', function(event) {
       });
     })
   );
-  self.skipWaiting();
+});
+
+// 接收主页面消息
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // 激活：清理旧缓存
