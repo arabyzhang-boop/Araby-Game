@@ -1,9 +1,9 @@
 // Naval Chess — Service Worker
-// 策略：网络优先 + 缓存回退（确保用户始终获取最新版本）
-// 在线：每次请求优先走网络，同时更新缓存
-// 离线：回退到缓存
+// 策略：
+//   HTML/JS/CSS  → 网络优先（保证实时更新）
+//   MP3/PNG 等媒体 → 缓存优先，后台更新（大文件秒加载）
 
-const CACHE_NAME = 'naval-chess-v3';
+const CACHE_NAME = 'naval-chess-v4';
 const PRECACHE_FILES = [
   './',
   'naval-chess.html',
@@ -24,7 +24,7 @@ const PRECACHE_FILES = [
   'manifest.json'
 ];
 
-// 安装：预缓存核心资源作为离线兜底
+// 安装：预缓存核心资源
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -36,14 +36,14 @@ self.addEventListener('install', function(event) {
   self.skipWaiting();
 });
 
-// 接收主页面消息
+// 接收消息
 self.addEventListener('message', function(event) {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// 激活：清理旧缓存，立即接管所有页面
+// 激活：清理旧缓存，立即接管
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(names) {
@@ -56,18 +56,52 @@ self.addEventListener('activate', function(event) {
   self.clients.claim();
 });
 
-// 请求：网络优先，失败时回退缓存
+// 请求：按文件类型分流策略
 self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
   var url = new URL(event.request.url);
 
-  // 不拦截的协议和域名
+  // 不拦截
   if (url.protocol === 'ws:' || url.protocol === 'wss:') return;
   if (/googletagmanager\.com|google-analytics\.com|analytics\.google\.com/.test(url.hostname)) return;
 
+  var path = url.pathname.toLowerCase();
+
+  // ── 媒体文件：缓存优先（大文件，极少变动） ──
+  if (/\.(mp3|png|jpg|jpeg|gif|svg|ico|woff2?)$/i.test(path)) {
+    event.respondWith(
+      caches.match(event.request).then(function(cached) {
+        if (cached) {
+          // 后台静默更新缓存
+          fetch(event.request).then(function(response) {
+            if (response && response.status === 200) {
+              caches.open(CACHE_NAME).then(function(cache) {
+                cache.put(event.request, response);
+              });
+            }
+          }).catch(function(){});
+          return cached;
+        }
+        // 首次访问，无缓存则走网络
+        return fetch(event.request).then(function(response) {
+          if (response && response.status === 200) {
+            var clone = response.clone();
+            caches.open(CACHE_NAME).then(function(cache) {
+              cache.put(event.request, clone);
+            });
+          }
+          return response;
+        }).catch(function() {
+          return new Response('', { status: 408 });
+        });
+      })
+    );
+    return;
+  }
+
+  // ── HTML / JS / CSS / 其他：网络优先 ──
   event.respondWith(
     fetch(event.request).then(function(response) {
-      // 网络请求成功 — 更新缓存并返回
       if (response && response.status === 200) {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
@@ -76,10 +110,8 @@ self.addEventListener('fetch', function(event) {
       }
       return response;
     }).catch(function() {
-      // 网络失败 — 尝试从缓存恢复
       return caches.match(event.request).then(function(cached) {
         if (cached) return cached;
-        // 离线且无缓存时返回空响应
         return new Response('', { status: 408 });
       });
     })
