@@ -513,20 +513,29 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
 
   if (!('serviceWorker' in navigator)) return;
 
-  // 检测 SW 更新
-  navigator.serviceWorker.ready.then(function(reg) {
-    reg.onupdatefound = function() {
-      var newWorker = reg.installing;
-      if (!newWorker) return;
-      newWorker.onstatechange = function() {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          showUpdateToast();
-        }
-      };
+  // 检测 SW 更新（处理竞态条件：updatefound 可能在 ready 回调前已触发）
+  function watchWorker(newWorker) {
+    if (!newWorker) return;
+    newWorker.onstatechange = function() {
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        showUpdateToast();
+      }
     };
-    if (reg.waiting && navigator.serviceWorker.controller) {
+    // 如果回调时已处于 installed 状态，立即触发
+    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
       showUpdateToast();
     }
+  }
+
+  navigator.serviceWorker.ready.then(function(reg) {
+    // 先检查是否已有正在安装/等待的 SW（可能在 ready 之前就触发了）
+    if (reg.installing) watchWorker(reg.installing);
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdateToast();
+
+    // 再监听未来的更新
+    reg.onupdatefound = function() {
+      watchWorker(reg.installing);
+    };
 
     // 每 20 分钟主动检查一次更新（浏览器默认约24小时才检查）
     setInterval(function() {

@@ -55,10 +55,12 @@ self.addEventListener('activate', function(event) {
 
 // 请求：缓存优先，网络回退
 self.addEventListener('fetch', function(event) {
-  // 跳过 WebSocket 和非 GET 请求
   if (event.request.method !== 'GET') return;
   var url = new URL(event.request.url);
+
+  // 不拦截的协议和域名
   if (url.protocol === 'ws:' || url.protocol === 'wss:') return;
+  if (/googletagmanager\.com|google-analytics\.com|analytics\.google\.com/.test(url.hostname)) return;
 
   event.respondWith(
     caches.match(event.request).then(function(cached) {
@@ -71,7 +73,6 @@ self.addEventListener('fetch', function(event) {
         });
         return response;
       }).catch(function() {
-        // 离线且无缓存：返回空响应
         return new Response('', { status: 408 });
       });
     })
