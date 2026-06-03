@@ -519,11 +519,11 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
     showUpdateToast();
   });
 
-  // 每 20 分钟主动检查更新
+  // 每 2 分钟主动检查更新
   navigator.serviceWorker.ready.then(function(reg) {
     setInterval(function() {
       reg.update().catch(function(){});
-    }, 20 * 60 * 1000);
+    }, 2 * 60 * 1000);
   });
 
   function showUpdateToast() {

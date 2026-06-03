@@ -1,7 +1,9 @@
 // Naval Chess — Service Worker
-// 缓存策略：安装时预缓存核心文件，请求时缓存优先
+// 策略：网络优先 + 缓存回退（确保用户始终获取最新版本）
+// 在线：每次请求优先走网络，同时更新缓存
+// 离线：回退到缓存
 
-const CACHE_NAME = 'naval-chess-v2';
+const CACHE_NAME = 'naval-chess-v3';
 const PRECACHE_FILES = [
   './',
   'naval-chess.html',
@@ -22,7 +24,7 @@ const PRECACHE_FILES = [
   'manifest.json'
 ];
 
-// 安装：预缓存所有静态资源，完成后立即激活（使 GA 等关键修复即时生效）
+// 安装：预缓存核心资源作为离线兜底
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function(cache) {
@@ -41,7 +43,7 @@ self.addEventListener('message', function(event) {
   }
 });
 
-// 激活：清理旧缓存
+// 激活：清理旧缓存，立即接管所有页面
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(names) {
@@ -54,7 +56,7 @@ self.addEventListener('activate', function(event) {
   self.clients.claim();
 });
 
-// 请求：缓存优先，网络回退
+// 请求：网络优先，失败时回退缓存
 self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
   var url = new URL(event.request.url);
@@ -64,16 +66,20 @@ self.addEventListener('fetch', function(event) {
   if (/googletagmanager\.com|google-analytics\.com|analytics\.google\.com/.test(url.hostname)) return;
 
   event.respondWith(
-    caches.match(event.request).then(function(cached) {
-      if (cached) return cached;
-      return fetch(event.request).then(function(response) {
-        if (!response || response.status !== 200) return response;
+    fetch(event.request).then(function(response) {
+      // 网络请求成功 — 更新缓存并返回
+      if (response && response.status === 200) {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
           cache.put(event.request, clone);
         });
-        return response;
-      }).catch(function() {
+      }
+      return response;
+    }).catch(function() {
+      // 网络失败 — 尝试从缓存恢复
+      return caches.match(event.request).then(function(cached) {
+        if (cached) return cached;
+        // 离线且无缓存时返回空响应
         return new Response('', { status: 408 });
       });
     })
