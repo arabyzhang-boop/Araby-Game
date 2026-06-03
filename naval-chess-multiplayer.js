@@ -87,7 +87,7 @@ function mpShowTurnNotification() {
   document.body.appendChild(toast);
   setTimeout(function() {
     if (toast.parentNode) toast.remove();
-  }, 2200);
+  }, 2600);
 }
 
 // ── WebSocket ──

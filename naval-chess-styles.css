@@ -1330,30 +1330,32 @@
 /* ═══ 联机回合切换提示 ═══ */
 .turn-notification {
   position: fixed;
-  top: 18px;
+  top: 14px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  background: linear-gradient(180deg, #3e2723 0%, #2a1810 100%);
-  border: 2px solid var(--gold);
-  border-radius: 8px;
-  padding: 10px 24px;
-  font-family: 'IM Fell English SC', 'Georgia', serif;
-  font-size: 16px;
-  letter-spacing: 2px;
-  color: var(--gold-light);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 20px rgba(201,169,78,0.2);
-  animation: turnNotifyIn 0.4s ease, turnNotifyOut 0.8s ease 1.2s forwards;
+  background: rgba(62, 39, 35, 0.72);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(201, 169, 78, 0.35);
+  border-radius: 4px;
+  padding: 7px 20px;
+  font-family: 'IM Fell English', 'Georgia', serif;
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 1px;
+  color: rgba(228, 210, 180, 0.85);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  animation: turnNotifyIn 0.35s ease, turnNotifyOut 0.7s ease 1.5s forwards;
   pointer-events: none;
   white-space: nowrap;
 }
 @keyframes turnNotifyIn {
-  from { transform: translateX(-50%) translateY(-30px); opacity: 0; }
+  from { transform: translateX(-50%) translateY(-12px); opacity: 0; }
   to { transform: translateX(-50%) translateY(0); opacity: 1; }
 }
 @keyframes turnNotifyOut {
   from { opacity: 1; }
-  to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 0; transform: translateX(-50%) translateY(-6px); }
 }
 
 /* ═══ PWA 版本更新提示 ═══ */
