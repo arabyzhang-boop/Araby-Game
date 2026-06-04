@@ -98,8 +98,6 @@ var campaignLevels = [
         skill: null, skillData: null },
       { name: '小型舰艇', length: 1, col: 11, row: 6, direction: DIR.W,
         skill: null, skillData: null },
-      { name: '小型舰艇', length: 1, col: 17, row: 6, direction: DIR.W,
-        skill: null, skillData: null },
       { name: '小型舰艇', length: 1, col: 17, row: 8, direction: DIR.W,
         skill: null, skillData: null }
     ],
@@ -313,11 +311,9 @@ function updateLibraryDisplay() {
     var ship = famousShipLibrary[i];
     var unlocked = campaignUnlockedShips.indexOf(i) >= 0;
     if (unlocked) {
-      var typeNames = { 1: '小型舰船', 2: '中型舰船', 3: '大型舰船' };
       html += '<button class="lib-ship-btn" onclick="showShipDetail(' + i + ')">';
       html += '<div class="lib-ship-flag">' + getFlagSVG(ship) + '</div>';
       html += '<div class="lib-ship-name">' + ship.name + '</div>';
-      html += '<div class="lib-ship-type">' + typeNames[ship.length] + '</div>';
       html += '</button>';
     } else {
       html += '<div class="library-ship locked">';

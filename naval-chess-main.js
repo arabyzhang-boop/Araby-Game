@@ -317,6 +317,10 @@ function mpGuard() {
     log('现在是对方回合，请等待');
     return false;
   }
+  if ((gameMode === 'ai' || inCampaign) && currentPlayerIndex === 1) {
+    log('请等待电脑回合结束');
+    return false;
+  }
   return true;
 }
 

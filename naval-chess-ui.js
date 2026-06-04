@@ -44,6 +44,17 @@ function updateInfoPanel() {
 }
 
 function updateActionButtons() {
+  // AI回合时禁用所有玩家按钮
+  if ((gameMode === 'ai' || inCampaign) && currentPlayerIndex === 1) {
+    btnMove.disabled = true; btnTurnLeft.disabled = true; btnTurnRight.disabled = true;
+    btnBroadside.disabled = true; btnRam.disabled = true; btnBoard.disabled = true;
+    btnSubmerge.disabled = true; btnBowCannon.disabled = true; btnGreekFire.disabled = true;
+    btnDevour.disabled = true; btnSharks.disabled = true; btnMine.disabled = true;
+    btnSupply.disabled = true; btnAmmo.disabled = true; btnEndTurn.disabled = true;
+    return;
+  }
+  btnEndTurn.disabled = false;
+
   const hasSelection = selectedShipIndex >= 0 && selectedShipIndex < ships.length;
   const ship = hasSelection ? ships[selectedShipIndex] : null;
   const isCurrentPlayer = ship && ship.playerIndex === currentPlayerIndex && (!mpGameStarted || currentPlayerIndex === mpPlayerIndex);

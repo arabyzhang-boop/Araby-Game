@@ -1042,7 +1042,7 @@ function greedyScore(action, shipIdx) {
       }
     }
     var distChange = oldDist - newDist; // 正=接近，负=远离
-    score = 8 + (distChange > 0 ? distChange * 4 : distChange * 1);
+    score = Math.max(6, 8 + (distChange > 0 ? distChange * 4 : distChange * 1));
   } else if (action.type === 'turn') {
     score = 3;
   } else if (action.type === 'broadside') {
@@ -1265,7 +1265,7 @@ function timidScore(action, shipIdx) {
     // 距敌1格以内才略扣（舷炮最佳距离2-4格，1格是撞击/接舷预备位）
     if (newDist <= 1 && oldDist > 1) moveScore -= 3;
     // 已经非常接近时不鼓励继续前冲，转交攻击行动评分接管
-    return moveScore;
+    return Math.max(10, moveScore);
   }
 
   if (action.type === 'turn') {
@@ -1401,7 +1401,7 @@ function recklessScore(action, shipIdx) {
     var distChange = oldDist - newDist;
     // 远离敌人时大幅扣分
     if (distChange < 0) distChange *= 3; // 越跑越远，严重扣分
-    return 10 + distChange * 5;
+    return Math.max(12, 10 + distChange * 5);
   }
   if (action.type === 'turn') {
     // 转向面对敌人则高分
@@ -1846,6 +1846,19 @@ function aiTakeTurn() {
         console.error('AI fallback 异常:', e2);
         switchToNextPlayer();
         return;
+      }
+    }
+
+    // 机动优先：如果能前进，就不要光转向（狭窄水域安全网）
+    if (bestAction && bestAction.type === 'turn') {
+      var moveActs = getLegalActions(1).filter(function(a) { return a.type === 'move'; });
+      if (moveActs.length > 0) {
+        var bestM = moveActs[0], bestMS = -Infinity;
+        for (var mi = 0; mi < moveActs.length; mi++) {
+          var ms = greedyScore(moveActs[mi], moveActs[mi].shipIdx);
+          if (ms > bestMS) { bestMS = ms; bestM = moveActs[mi]; }
+        }
+        bestAction = bestM;
       }
     }
 
