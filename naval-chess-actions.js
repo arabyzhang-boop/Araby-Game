@@ -788,7 +788,42 @@ function ammoSupport() {
   return true;
 }
 
-// ── 布雷（屠夫号） ──
+// ── 布雷 AI版（直接放置，无需点击） ──
+function enterMinePlacementAI() {
+  if (gameOver) return false;
+  if (selectedShipIndex < 0) return false;
+  var ship = ships[selectedShipIndex];
+  if (ship.playerIndex !== currentPlayerIndex) return false;
+  if (!ship.skillData || !ship.skillData.canLayMines) return false;
+  if (ship.boardingTargets.length > 0) return false;
+  if (ship.actionsRemaining < 1) return false;
+  if (ship.minesPlaced >= 3) return false;
+  var cells = getShipCells(ship);
+  for (var ci = 0; ci < cells.length; ci++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        var mc = cells[ci].col + dx, mr = cells[ci].row + dy;
+        if (mc < 0 || mc >= GRID_SIZE || mr < 0 || mr >= GRID_SIZE) continue;
+        if (findShipAt(mc, mr) >= 0) continue;
+        if (isCellOccupied(mc, mr, -1)) continue;
+        var hasMine = false;
+        for (var mi = 0; mi < mines.length; mi++) {
+          if (mines[mi].col === mc && mines[mi].row === mr) { hasMine = true; break; }
+        }
+        if (hasMine) continue;
+        mines.push({ col: mc, row: mr });
+        ship.minesPlaced++;
+        mpPendingAction = { type: 'skill', skill: 'layMine' };
+        afterShipAction(ship, shipName(selectedShipIndex) + ' 在 ' + String.fromCharCode(65 + mc) + (mr + 1) + ' 布设水雷', 1);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ── 布雷（屠夫号，玩家版） ──
 function enterMinePlacement() {
   if (gameOver) return false;
   if (selectedShipIndex < 0) return false;

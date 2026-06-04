@@ -318,6 +318,32 @@ function _simCheckMineCollision(cells, shipIdx) {
   return false;
 }
 
+// ── 静默查找侧边相邻友舰（模拟用，用于补给/弹药支援） ──
+function _simFindAdjacentFriendly(shipIdx) {
+  var ship = ships[shipIdx];
+  if (!ship) return -1;
+  var sc = _simCells(ship);
+  var aDv = DIR_VECTORS[ship.direction];
+  for (var j = 0; j < ships.length; j++) {
+    if (j === shipIdx) continue;
+    if (ships[j].playerIndex !== ship.playerIndex) continue;
+    if (ships[j].submerged) continue;
+    var ec = _simCells(ships[j]);
+    var bDv = DIR_VECTORS[ships[j].direction];
+    for (var si = 0; si < sc.length; si++) {
+      for (var ei = 0; ei < ec.length; ei++) {
+        var dc = ec[ei].col - sc[si].col;
+        var dr = ec[ei].row - sc[si].row;
+        if (Math.abs(dc) + Math.abs(dr) !== 1) continue;
+        if ((dc * aDv.dx + dr * aDv.dy) !== 0) continue;
+        if ((dc * bDv.dx + dr * bDv.dy) !== 0) continue;
+        return j;
+      }
+    }
+  }
+  return -1;
+}
+
 // ── 静默地形效果（模拟用） ──
 function _simProcessTerrainEffects(shipIdx) {
   if (terrain.length === 0) return false;
@@ -343,10 +369,68 @@ function _simProcessTerrainEffects(shipIdx) {
   return false;
 }
 
+// ── 静默布雷（模拟用） ──
+function _simLayMine(shipIdx) {
+  var ship = ships[shipIdx];
+  if (ship.minesPlaced >= 3) return false;
+  var cells = _simCells(ship);
+  for (var ci = 0; ci < cells.length; ci++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        var mc = cells[ci].col + dx;
+        var mr = cells[ci].row + dy;
+        if (mc < 0 || mc >= GRID_SIZE || mr < 0 || mr >= GRID_SIZE) continue;
+        if (_simFindShipAt(mc, mr) >= 0) continue;
+        if (_simOccupied(mc, mr, -1, 0)) continue;
+        var hasMine = false;
+        for (var mi = 0; mi < mines.length; mi++) {
+          if (mines[mi].col === mc && mines[mi].row === mr) { hasMine = true; break; }
+        }
+        if (hasMine) continue;
+        mines.push({ col: mc, row: mr });
+        ship.minesPlaced++;
+        ship.actionsRemaining--;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ── 静默补给（模拟用） ──
+function _simSupply(shipIdx) {
+  var ship = ships[shipIdx];
+  if (ship.supplyUsed >= 3) return false;
+  var targetIdx = _simFindAdjacentFriendly(shipIdx);
+  if (targetIdx < 0) return false;
+  var target = ships[targetIdx];
+  if (target.hp >= target.maxHp) return false;
+  target.hp++;
+  ship.supplyUsed++;
+  ship.actionsRemaining--;
+  return true;
+}
+
+// ── 静默弹药支援（模拟用） ──
+function _simAmmoSupport(shipIdx) {
+  var ship = ships[shipIdx];
+  if (ship.broadsideCount >= ship.maxBroadsideCount) return false;
+  var targetIdx = _simFindAdjacentFriendly(shipIdx);
+  if (targetIdx < 0) return false;
+  var target = ships[targetIdx];
+  if (target.broadsideCount === 0) return false;
+  target.broadsideCount--;
+  ship.broadsideCount = ship.maxBroadsideCount;
+  ship.actionsRemaining--;
+  return true;
+}
+
 // ── 静默行动函数（不写日志、不渲染） ──
 
 function _simMoveForward(shipIdx) {
   var ship = ships[shipIdx];
+  if (ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2) return false;
   var step = ship.submerged ? 2 : 1;
   var dv = DIR_VECTORS[ship.direction];
   var newCol = ship.col + dv.dx * step;
@@ -358,6 +442,7 @@ function _simMoveForward(shipIdx) {
   }
   ship.col = newCol; ship.row = newRow;
   ship.stepsMoved += step; ship.chargeSteps += step;
+  if (ship.skillData && ship.skillData.ironArmor) ship.ironArmorMoves++;
   // 鲨鱼/水雷碰撞
   if (!ship.submerged && !(ship.skillData && ship.skillData.canReleaseSharks)) {
     var sc = _simCells(ship);
@@ -676,18 +761,21 @@ function getLegalActions(playerIdx) {
 
     var sid = i;
 
-    // 前进
-    var dv = DIR_VECTORS[ship.direction];
-    var step = ship.submerged ? 2 : 1;
-    var nc = ship.col + dv.dx * step;
-    var nr = ship.row + dv.dy * step;
-    var cells = _simCellsAt(ship, nc, nr);
-    var canMove = true;
-    for (var ci = 0; ci < cells.length; ci++) {
-      if (cells[ci].col < 0 || cells[ci].col >= GRID_SIZE || cells[ci].row < 0 || cells[ci].row >= GRID_SIZE) { canMove = false; break; }
-      if (_simOccupied(cells[ci].col, cells[ci].row, i, ship.length)) { canMove = false; break; }
+    // 前进（铁甲限制：每回合最多2次）
+    var ironBlocked = ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2;
+    if (!ironBlocked) {
+      var dv = DIR_VECTORS[ship.direction];
+      var step = ship.submerged ? 2 : 1;
+      var nc = ship.col + dv.dx * step;
+      var nr = ship.row + dv.dy * step;
+      var cells = _simCellsAt(ship, nc, nr);
+      var canMove = true;
+      for (var ci = 0; ci < cells.length; ci++) {
+        if (cells[ci].col < 0 || cells[ci].col >= GRID_SIZE || cells[ci].row < 0 || cells[ci].row >= GRID_SIZE) { canMove = false; break; }
+        if (_simOccupied(cells[ci].col, cells[ci].row, i, ship.length)) { canMove = false; break; }
+      }
+      if (canMove) actions.push({ type: 'move', shipIdx: sid });
     }
-    if (canMove) actions.push({ type: 'move', shipIdx: sid });
 
     // 转向
     if (ship.actionsRemaining >= ship.length) {
@@ -791,6 +879,24 @@ function getLegalActions(playerIdx) {
       if (sd.canReleaseSharks && !ship.sharksUsed && ship.boardingTargets.length === 0 && nearDist < 999) {
         actions.push({ type: 'skill', shipIdx: sid, skill: 'sharks' });
       }
+      // 布雷：船体周围有空格即可
+      if (sd.canLayMines && ship.minesPlaced < 3 && ship.boardingTargets.length === 0) {
+        actions.push({ type: 'skill', shipIdx: sid, skill: 'layMine' });
+      }
+      // 补给：侧边有受伤友舰
+      if (sd.canSupply && ship.supplyUsed < 3 && ship.boardingTargets.length === 0) {
+        var supTarget = _simFindAdjacentFriendly(sid);
+        if (supTarget >= 0 && ships[supTarget].hp < ships[supTarget].maxHp) {
+          actions.push({ type: 'skill', shipIdx: sid, skill: 'supply' });
+        }
+      }
+      // 弹药支援：侧边有已开炮的友舰
+      if (sd.canSupply && ship.broadsideCount < ship.maxBroadsideCount && ship.boardingTargets.length === 0) {
+        var ammoTarget = _simFindAdjacentFriendly(sid);
+        if (ammoTarget >= 0 && ships[ammoTarget].broadsideCount > 0) {
+          actions.push({ type: 'skill', shipIdx: sid, skill: 'ammoSupport' });
+        }
+      }
     }
   }
 
@@ -806,7 +912,12 @@ function executeSimAction(action) {
   if (action.type === 'broadside') return _simBroadside(action.shipIdx);
   if (action.type === 'ram') return _simRam(action.shipIdx);
   if (action.type === 'board') return _simBoard(action.shipIdx);
-  if (action.type === 'skill') return _simSkill(action.shipIdx, action.skill);
+  if (action.type === 'skill') {
+    if (action.skill === 'layMine') return _simLayMine(action.shipIdx);
+    if (action.skill === 'supply') return _simSupply(action.shipIdx);
+    if (action.skill === 'ammoSupport') return _simAmmoSupport(action.shipIdx);
+    return _simSkill(action.shipIdx, action.skill);
+  }
   if (action.type === 'endTurn') {
     // 处理接舷战伤害
     var defeated = [];
@@ -949,6 +1060,9 @@ function greedyScore(action, shipIdx) {
     else if (action.skill === 'sharks') score = 12;
     else if (action.skill === 'surface') score = 14;
     else if (action.skill === 'submerge') score = 6;
+    else if (action.skill === 'layMine') score = 8;
+    else if (action.skill === 'supply') score = 10;
+    else if (action.skill === 'ammoSupport') score = 7;
     else score = 5;
   } else if (action.type === 'endTurn') {
     score = -5; // 有行动就不该结束
@@ -1057,6 +1171,9 @@ function simPlayout(playerIdx) {
         if (a.type === 'skill' && a.skill === 'bowCannon') w = 6;
         if (a.type === 'skill' && a.skill === 'greekFire') w = 5;
         if (a.type === 'skill' && a.skill === 'sharks') w = 4;
+        if (a.type === 'skill' && a.skill === 'layMine') w = 3;
+        if (a.type === 'skill' && a.skill === 'supply') w = 4;
+        if (a.type === 'skill' && a.skill === 'ammoSupport') w = 3;
         if (a.type === 'endTurn') w = 0.3;
         weights.push(w); totalW += w;
       }
@@ -1213,6 +1330,9 @@ function timidScore(action, shipIdx) {
     if (action.skill === 'sharks') return 12;
     if (action.skill === 'surface') return 8;
     if (action.skill === 'submerge') return 25; // 偏好保命
+    if (action.skill === 'layMine') return 10;
+    if (action.skill === 'supply') return 14;
+    if (action.skill === 'ammoSupport') return 8;
     return 6;
   }
 
@@ -1316,6 +1436,9 @@ function recklessScore(action, shipIdx) {
     if (action.skill === 'sharks') return 18;
     if (action.skill === 'surface') return 20;
     if (action.skill === 'submerge') return 3; // 鲁莽不喜欢躲
+    if (action.skill === 'layMine') return 8;
+    if (action.skill === 'supply') return 6;
+    if (action.skill === 'ammoSupport') return 4;
     return 10;
   }
   if (action.type === 'endTurn') return -50; // 绝不主动结束
@@ -1744,20 +1867,30 @@ function aiTakeTurn() {
     setTimeout(function() {
       if (gameOver) { clearTimeout(aiFailsafeTimer); return; }
       if (currentPlayerIndex !== 1) { clearTimeout(aiFailsafeTimer); return; }
-      if (bestAction.type === 'move') moveShipForward();
-      else if (bestAction.type === 'turn') turnShip(bestAction.delta);
-      else if (bestAction.type === 'broadside') fireBroadside();
-      else if (bestAction.type === 'ram') initiateRamming();
-      else if (bestAction.type === 'board') initiateBoarding();
+      var actionOk = true;
+      if (bestAction.type === 'move') actionOk = moveShipForward();
+      else if (bestAction.type === 'turn') actionOk = turnShip(bestAction.delta);
+      else if (bestAction.type === 'broadside') actionOk = fireBroadside();
+      else if (bestAction.type === 'ram') actionOk = initiateRamming();
+      else if (bestAction.type === 'board') actionOk = initiateBoarding();
       else if (bestAction.type === 'skill') {
-        if (bestAction.skill === 'submerge') submergeShip();
-        else if (bestAction.skill === 'surface') surfaceShip();
-        else if (bestAction.skill === 'bowCannon') fireBowCannon();
-        else if (bestAction.skill === 'greekFire') fireGreekFire();
-        else if (bestAction.skill === 'devour') devourShip();
-        else if (bestAction.skill === 'sharks') releaseSharks();
+        if (bestAction.skill === 'submerge') actionOk = submergeShip();
+        else if (bestAction.skill === 'surface') actionOk = surfaceShip();
+        else if (bestAction.skill === 'bowCannon') actionOk = fireBowCannon();
+        else if (bestAction.skill === 'greekFire') actionOk = fireGreekFire();
+        else if (bestAction.skill === 'devour') actionOk = devourShip();
+        else if (bestAction.skill === 'sharks') actionOk = releaseSharks();
+        else if (bestAction.skill === 'layMine') actionOk = enterMinePlacementAI();
+        else if (bestAction.skill === 'supply') actionOk = supplyShip();
+        else if (bestAction.skill === 'ammoSupport') actionOk = ammoSupport();
       }
       clearTimeout(aiFailsafeTimer);
+      // 行动失败则强制结束回合
+      if (!actionOk && currentPlayerIndex === 1 && !gameOver) {
+        log('—— AI 行动受阻，强制结束回合 ——');
+        switchToNextPlayer();
+        return;
+      }
       updateInfoPanel(); render();
       // 检查是否仍在AI回合（行动可能触发回合切换）
       if (currentPlayerIndex === 1 && !gameOver) {
