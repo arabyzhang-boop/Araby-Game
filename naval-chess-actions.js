@@ -16,10 +16,14 @@ function afterShipAction(ship, actionDesc, cost) {
   if (processTerrainEffects(ship)) return;
 
   // 多人联机：仅本地行动才发送到对手（远程执行不重复发送）
-  if (mpGameStarted && !mpRemoteExec && mpPendingAction) {
-    mpPendingAction.shipIdx = ships.indexOf(ship);
-    sendAction(mpPendingAction);
-    mpPendingAction = null;
+  if (mpGameStarted && !mpRemoteExec) {
+    if (mpPendingAction) {
+      mpPendingAction.shipIdx = ships.indexOf(ship);
+      sendAction(mpPendingAction);
+      mpPendingAction = null;
+    } else {
+      console.warn('[联机] 行动未设置 mpPendingAction，将不同步到对手！调用栈:', new Error().stack);
+    }
   }
 
   clearBrokenBoarding(); // 移动/转向后清理不再接触的接舷关系
@@ -761,6 +765,7 @@ function supplyShip() {
 
   target.hp++;
   ship.supplyUsed++;
+  mpPendingAction = { type: 'skill', skill: 'supply', targetIdx: targetIdx, supplyUsed: ship.supplyUsed };
   addHitEffect(target.col, target.row, '❤️‍🩹');
   afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 回复1点生命（剩余 ${target.hp} HP）`, 1);
   return true;
@@ -783,6 +788,7 @@ function ammoSupport() {
 
   target.broadsideCount--;
   ship.broadsideCount = ship.maxBroadsideCount;
+  mpPendingAction = { type: 'skill', skill: 'ammoSupport', targetIdx: targetIdx };
   addHitEffect(target.col, target.row, '🔧');
   afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 补充了一次舷炮`, 1);
   return true;
@@ -814,7 +820,7 @@ function enterMinePlacementAI() {
         if (hasMine) continue;
         mines.push({ col: mc, row: mr });
         ship.minesPlaced++;
-        mpPendingAction = { type: 'skill', skill: 'layMine' };
+        mpPendingAction = { type: 'skill', skill: 'layMine', mineCol: mc, mineRow: mr, minesPlaced: ship.minesPlaced };
         afterShipAction(ship, shipName(selectedShipIndex) + ' 在 ' + String.fromCharCode(65 + mc) + (mr + 1) + ' 布设水雷', 1);
         return true;
       }
@@ -869,6 +875,7 @@ function placeMineAt(col, row) {
 
   mines.push({ col: col, row: row });
   ship.minesPlaced++;
+  mpPendingAction = { type: 'skill', skill: 'layMine', mineCol: col, mineRow: row, minesPlaced: ship.minesPlaced };
   minePlacementMode = false;
   minePlacementShip = null;
 

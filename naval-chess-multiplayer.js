@@ -207,6 +207,9 @@ function handleServerMessage(msg) {
         btnEndTurn.disabled = false;
         updateInfoPanel();
         render();
+        // 状态校验：计算棋盘哈希（双方应一致，不一致则已发生分叉）
+        var hash = mpComputeStateHash();
+        console.log('[联机] 回合 ' + msg.turnNumber + ' 状态哈希: ' + hash);
         if (mpPlayerIndex === currentPlayerIndex) {
           mpShowTurnNotification();
         } else {
@@ -609,6 +612,82 @@ function mpWaitForTurnSwitch() {
 
 var mpRemoteExec = false; // 远程执行中标志
 
+// ── 状态校验哈希（调试用：双方回合切换后应输出相同值） ──
+function mpComputeStateHash() {
+  var parts = [];
+  for (var i = 0; i < ships.length; i++) {
+    var s = ships[i];
+    parts.push(s.col + ',' + s.row + ',' + s.length + ',' + s.direction + ',' + s.playerIndex + ',' + s.hp + ',' + s.actionsRemaining + ',' + s.broadsideCount + ',' + (s.submerged ? 1 : 0));
+  }
+  for (var j = 0; j < mines.length; j++) {
+    parts.push('M' + mines[j].col + ',' + mines[j].row);
+  }
+  for (var k = 0; k < sharks.length; k++) {
+    parts.push('S' + sharks[k].col + ',' + sharks[k].row);
+  }
+  parts.push('P' + currentPlayerIndex + 'T' + currentTurn);
+  // 简单哈希：字符串长度 + 首尾字符异或
+  var str = parts.join('|');
+  var hash = 0;
+  for (var h = 0; h < str.length; h++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(h);
+    hash |= 0; // 转32位整数
+  }
+  return (hash >>> 0).toString(16);
+}
+
+// ── 联机行动统一调度表（新增行动/技能只需在此添加一行） ──
+var MP_REMOTE_DISPATCH = {
+  move: function(a) { moveShipForward(); },
+  turn: function(a) { turnShip(a.delta); },
+  broadside: function(a) { fireBroadside(); },
+  ram: function(a) { initiateRamming(); },
+  board: function(a) { initiateBoarding(); },
+  'skill:submerge': function(a) { submergeShip(); },
+  'skill:surface': function(a) { surfaceShip(); },
+  'skill:bowCannon': function(a) { fireBowCannon(); },
+  'skill:greekFire': function(a) { fireGreekFire(); },
+  'skill:devour': function(a) { devourShip(); },
+  'skill:sharks': function(a) { releaseSharks(); },
+  'skill:layMine': function(a) { mpRemoteLayMine(a); },
+  'skill:supply': function(a) { mpRemoteSupply(a); },
+  'skill:ammoSupport': function(a) { mpRemoteAmmoSupport(a); }
+};
+
+// ── 远程重放：布雷 ──
+function mpRemoteLayMine(action) {
+  var ship = ships[action.shipIdx];
+  if (!ship) return;
+  mines.push({ col: action.mineCol, row: action.mineRow });
+  ship.minesPlaced = action.minesPlaced;
+  ship.actionsRemaining--;
+  render();
+}
+
+// ── 远程重放：补给 ──
+function mpRemoteSupply(action) {
+  var ship = ships[action.shipIdx];
+  var target = ships[action.targetIdx];
+  if (!ship || !target) return;
+  target.hp = Math.min(target.hp + 1, target.maxHp);
+  ship.supplyUsed = action.supplyUsed;
+  ship.actionsRemaining--;
+  addHitEffect(target.col, target.row, '❤️‍🩹');
+  render();
+}
+
+// ── 远程重放：弹药支援 ──
+function mpRemoteAmmoSupport(action) {
+  var ship = ships[action.shipIdx];
+  var target = ships[action.targetIdx];
+  if (!ship || !target) return;
+  target.broadsideCount = Math.max(0, target.broadsideCount - 1);
+  ship.broadsideCount = ship.maxBroadsideCount;
+  ship.actionsRemaining--;
+  addHitEffect(target.col, target.row, '🔧');
+  render();
+}
+
 function applyRemoteAction(action) {
   mpRemoteExec = true;
   var savedPlayer = currentPlayerIndex;
@@ -633,18 +712,14 @@ function applyRemoteAction(action) {
   if (action.shipIdx !== undefined) {
     selectedShipIndex = action.shipIdx;
   }
-  if (action.type === 'move') moveShipForward();
-  else if (action.type === 'turn') turnShip(action.delta);
-  else if (action.type === 'broadside') fireBroadside();
-  else if (action.type === 'ram') initiateRamming();
-  else if (action.type === 'board') initiateBoarding();
-  else if (action.type === 'skill') {
-    if (action.skill === 'submerge') submergeShip();
-    else if (action.skill === 'surface') surfaceShip();
-    else if (action.skill === 'bowCannon') fireBowCannon();
-    else if (action.skill === 'greekFire') fireGreekFire();
-    else if (action.skill === 'devour') devourShip();
-    else if (action.skill === 'sharks') releaseSharks();
+  // 统一调度：查找远程处理器（新增行动只需在 MP_REMOTE_DISPATCH 加一行）
+  var dispatchKey = action.type === 'skill' ? 'skill:' + action.skill : action.type;
+  var handler = MP_REMOTE_DISPATCH[dispatchKey];
+  if (handler) {
+    handler(action);
+  } else {
+    console.error('[联机] 未知行动类型，缺少远程处理器: ' + dispatchKey, action);
+    log('[联机] 收到未同步的行动类型，请联系开发者');
   }
   currentPlayerIndex = savedPlayer;
   mpRemoteExec = false;
