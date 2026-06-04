@@ -121,12 +121,13 @@ function processTerrainEffects(ship) {
       document.getElementById('victoryFaction').textContent = pNames[ship.playerIndex] + ' 占领了目标点';
       document.getElementById('victoryTitle').textContent = 'VICTORY';
       document.getElementById('victoryTitle').classList.remove('defeat');
+      updateVictoryStars(getStarRating(ship.playerIndex));
       var vo = document.getElementById('victoryOverlay');
       vo.classList.remove('hidden'); vo.style.display = 'flex';
       btnEndTurn.disabled = true; btnReset.disabled = true;
       log('🚩 ' + shipNameStr + ' 占据目标点，' + pNames[ship.playerIndex] + ' 获得胜利！');
       updateInfoPanel(); render();
-      if (inCampaign && ship.playerIndex === 0) completeCurrentLevel();
+      if (inCampaign && ship.playerIndex === 0) completeCurrentLevel(getStarRating(ship.playerIndex));
       return true;
     }
 
@@ -258,4 +259,38 @@ function isAdjacentToEnemy(shipIndex) {
     }
   }
   return false;
+}
+
+// ── 记录初始舰队统计（开局时调用） ──
+function recordInitialFleetStats() {
+  initialFleetStats = [];
+  for (var p = 0; p < 2; p++) {
+    var pShips = ships.filter(function(s) { return s.playerIndex === p; });
+    var totalHp = 0;
+    for (var i = 0; i < pShips.length; i++) { totalHp += pShips[i].maxHp; }
+    initialFleetStats.push({ shipCount: pShips.length, totalMaxHp: totalHp });
+  }
+}
+
+// ── 星级评定 ──
+function getStarRating(winnerIdx) {
+  if (!initialFleetStats[winnerIdx] || initialFleetStats[winnerIdx].shipCount === 0) return 1;
+  var init = initialFleetStats[winnerIdx];
+  var alive = ships.filter(function(s) { return s.playerIndex === winnerIdx; });
+  var aliveHp = 0;
+  for (var i = 0; i < alive.length; i++) { aliveHp += alive[i].hp; }
+  if (alive.length >= init.shipCount * 0.5 && aliveHp >= init.totalMaxHp * 0.5) return 3;
+  if (alive.length >= init.shipCount * 0.5) return 2;
+  return 1;
+}
+
+// ── 更新胜利面板星级显示 ──
+function updateVictoryStars(starCount) {
+  var el = document.getElementById('victoryStars');
+  if (!el) return;
+  var html = '';
+  for (var s = 1; s <= 3; s++) {
+    html += s <= starCount ? '<span class="star">⭐</span>' : '<span class="star star-off">⭐</span>';
+  }
+  el.innerHTML = html;
 }

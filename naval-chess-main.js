@@ -244,6 +244,8 @@ buildLabels();
 // ── 事件：点击棋盘 ──
 canvas.addEventListener('click', function(e) {
   if (gameOver) return;
+  // AI/关卡模式中电脑回合禁止玩家点选棋子
+  if ((gameMode === 'ai' || inCampaign) && currentPlayerIndex === 1) return;
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;

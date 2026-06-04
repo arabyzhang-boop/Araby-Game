@@ -682,6 +682,7 @@ function mpEndGame(msg, isWinner) {
     titleEl.classList.add('defeat');
   }
 
+  updateVictoryStars(getStarRating(winnerIdx));
   document.getElementById('victoryOverlay').classList.remove('hidden');
   document.getElementById('victoryOverlay').style.display = 'flex';
   document.getElementById('btnEndTurn').disabled = true;

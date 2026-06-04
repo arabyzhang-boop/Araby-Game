@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════
 
 // 更新版本时请修改此版本号（格式: YYMMDD-N）
-var APP_VERSION = '250604-14';
+var APP_VERSION = '250605-02';
 
 // ── 菜单控制 ──
 var gameMode = 'pvp'; // 'pvp' | 'ai'
@@ -104,6 +104,9 @@ var TERRAIN = {
   POWDER_KEG: 'powderKeg'        // 火药桶：占据补充一次舷炮
 };
 var terrain = []; // { col, row, type }
+
+// ── 初始舰队统计（用于星级评定） ──
+var initialFleetStats = []; // [{ shipCount, totalMaxHp }] per player
 
 // ── AI 超时保护 ──
 var aiFailsafeTimer = null;

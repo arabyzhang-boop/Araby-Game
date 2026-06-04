@@ -81,6 +81,7 @@ function initTestShips(redPicks, bluePicks) {
   selectedShipIndex = -1;
   currentPlayerIndex = 0;
   currentTurn = 1;
+  recordInitialFleetStats();
   updatePlayerDisplay();
   updateInfoPanel();
   updateActionButtons();

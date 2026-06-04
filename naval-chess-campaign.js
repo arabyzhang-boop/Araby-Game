@@ -6,12 +6,15 @@
 // ── 存档持久化 ──
 var CAMPAIGN_SAVE_KEY = 'navalChessCampaign_v1';
 
+var campaignBestStars = {}; // { levelId: starCount }
+
 function saveCampaignProgress() {
   try {
     var data = {
-      v: 1,
+      v: 2,
       unlockedShips: campaignUnlockedShips,
-      completedLevels: campaignCompletedLevels
+      completedLevels: campaignCompletedLevels,
+      bestStars: campaignBestStars
     };
     localStorage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -24,10 +27,10 @@ function loadCampaignProgress() {
     var raw = localStorage.getItem(CAMPAIGN_SAVE_KEY);
     if (!raw) return;
     var data = JSON.parse(raw);
-    if (data.v === 1) {
-      campaignUnlockedShips = data.unlockedShips || [];
-      campaignCompletedLevels = data.completedLevels || [];
-    }
+    // v1 兼容：无 bestStars，默认为空
+    campaignUnlockedShips = data.unlockedShips || [];
+    campaignCompletedLevels = data.completedLevels || [];
+    campaignBestStars = data.bestStars || {};
   } catch (e) {
     // 数据损坏则丢弃，保留默认空数组
   }
@@ -252,6 +255,7 @@ function initCampaignGame(redPicks) {
   selectedShipIndex = -1;
   currentPlayerIndex = 0;
   currentTurn = 1;
+  recordInitialFleetStats();
   updatePlayerDisplay();
   updateInfoPanel();
   updateActionButtons();
@@ -261,12 +265,16 @@ function initCampaignGame(redPicks) {
 // ── 关卡通关处理 ──
 var _pendingUnlockShip = null; // 待显示的名船解锁信息
 
-function completeCurrentLevel() {
+function completeCurrentLevel(starCount) {
   var level = campaignLevels[campaignLevelId - 1];
   var isNew = campaignCompletedLevels.indexOf(campaignLevelId) < 0;
   if (isNew) {
     campaignCompletedLevels.push(campaignLevelId);
   }
+  // 保存最佳星级
+  var prev = campaignBestStars[campaignLevelId] || 0;
+  var stars = starCount || 1;
+  if (stars > prev) campaignBestStars[campaignLevelId] = stars;
   if (level.unlockShip !== undefined && campaignUnlockedShips.indexOf(level.unlockShip) < 0) {
     campaignUnlockedShips.push(level.unlockShip);
     _pendingUnlockShip = famousShipLibrary[level.unlockShip]; // 延迟到结算窗口之后显示
@@ -298,6 +306,20 @@ function updateCampaignLevelButtons() {
     btn.classList.remove('locked');
     if (campaignCompletedLevels.indexOf(i + 1) >= 0) {
       btn.classList.add('completed');
+    }
+    // 更新星级显示
+    var starEl = document.getElementById('lvl' + (i + 1) + 'Stars');
+    if (starEl) {
+      var best = campaignBestStars[i + 1] || 0;
+      if (best > 0) {
+        var html = '';
+        for (var s = 1; s <= 3; s++) {
+          html += s <= best ? '⭐' : '<span style="opacity:0.25">⭐</span>';
+        }
+        starEl.innerHTML = html;
+      } else {
+        starEl.innerHTML = '';
+      }
     }
   }
 }

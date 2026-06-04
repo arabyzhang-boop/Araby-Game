@@ -200,6 +200,7 @@ function checkVictory() {
         titleEl.classList.add('defeat');
       }
 
+      updateVictoryStars(getStarRating(winner));
       var vo = document.getElementById('victoryOverlay');
       vo.classList.remove('hidden');
       vo.style.display = 'flex';
@@ -208,7 +209,7 @@ function checkVictory() {
       updateInfoPanel();
       render();
       log(`—— ${pNames[winner]} 获得胜利！ ——`);
-      if (inCampaign && winner === 0) { completeCurrentLevel(); }
+      if (inCampaign && winner === 0) { completeCurrentLevel(getStarRating(winner)); }
       return;
     }
   }

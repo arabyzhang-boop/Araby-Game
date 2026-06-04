@@ -83,14 +83,14 @@
     <div class="campaign-title">关卡模式</div>
     <div class="selection-divider"></div>
     <div class="campaign-grid" id="campaignGrid">
-      <button class="campaign-level locked" id="lvl1">关卡 1</button>
-      <button class="campaign-level locked" id="lvl2">关卡 2</button>
-      <button class="campaign-level locked" id="lvl3">关卡 3</button>
-      <button class="campaign-level locked" id="lvl4">关卡 4</button>
-      <button class="campaign-level locked" id="lvl5">关卡 5</button>
-      <button class="campaign-level locked" id="lvl6">关卡 6</button>
-      <button class="campaign-level locked" id="lvl7">关卡 7</button>
-      <button class="campaign-level locked" id="lvl8">关卡 8</button>
+      <button class="campaign-level locked" id="lvl1">关卡 1<span class="level-stars" id="lvl1Stars"></span></button>
+      <button class="campaign-level locked" id="lvl2">关卡 2<span class="level-stars" id="lvl2Stars"></span></button>
+      <button class="campaign-level locked" id="lvl3">关卡 3<span class="level-stars" id="lvl3Stars"></span></button>
+      <button class="campaign-level locked" id="lvl4">关卡 4<span class="level-stars" id="lvl4Stars"></span></button>
+      <button class="campaign-level locked" id="lvl5">关卡 5<span class="level-stars" id="lvl5Stars"></span></button>
+      <button class="campaign-level locked" id="lvl6">关卡 6<span class="level-stars" id="lvl6Stars"></span></button>
+      <button class="campaign-level locked" id="lvl7">关卡 7<span class="level-stars" id="lvl7Stars"></span></button>
+      <button class="campaign-level locked" id="lvl8">关卡 8<span class="level-stars" id="lvl8Stars"></span></button>
     </div>
     <div class="campaign-actions">
       <button class="selection-btn skip" id="btnCampaignBack">返回</button>
@@ -276,6 +276,7 @@
       <div class="victory-stat">💥 舷炮击杀 <span id="victoryBroadsideKills">0</span></div>
       <div class="victory-stat">⚔ 接舷击杀 <span id="victoryBoardingKills">0</span></div>
     </div>
+    <div class="victory-stars" id="victoryStars"></div>
     <button class="victory-btn" id="btnVictoryMenu">返回菜单</button>
   </div>
 </div>
@@ -368,9 +369,10 @@
         </div>
         <div class="help-section" id="helpSec6">
           <h3>对局介绍</h3>
-          <p>选船阶段结束后，双方的舰船将随机刷新在各自一边。<strong>经典模式</strong>下双方初始位置较远，而<strong>极速模式</strong>下较近。</p>
-          <p>对局为回合制，每回合每方基础舰船均有 <strong>3 点行动力</strong>可以下达命令。当一方本回合所有舰船行动力耗尽后，将自动进入另一方回合。回合方还可以使用<strong>"结束回合"</strong>按钮主动跳过回合。</p>
-          <p>玩家可通过 <strong>Captain's Log</strong> 来查看棋盘事件。当一方舰队完全被摧毁，游戏结束，另一方获得胜利。</p>
+          <p>选船阶段结束后，双方的舰船将随机刷新在各自一边。经典模式下双方初始位置较远，而极速模式下较近。</p>
+          <p>对局为回合制，每回合每方基础舰船均有 3 点行动力可以下达命令。当一方本回合所有舰船行动力耗尽后，将自动进入另一方回合。回合方还可以使用"结束回合"按钮主动跳过回合。</p>
+          <p>玩家可通过 Captain's Log 来查看棋盘事件。当一方舰队完全被摧毁，游戏结束，另一方获得胜利。</p>
+          <p>胜利方根据剩余战力评星：⭐ 基础胜利；⭐⭐ 剩余舰船数 ≥ 己方初始舰船数的50%；⭐⭐⭐ 满足二星条件且剩余舰船总血量 ≥ 己方初始总血量的50%。关卡模式记录各关卡最佳星级。</p>
         </div>
       </div>
     </div>

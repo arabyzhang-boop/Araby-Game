@@ -692,6 +692,16 @@
   .victory-stat.full {
     grid-column: 1 / -1;
   }
+  .victory-stars {
+    font-size: 26px;
+    letter-spacing: 6px;
+    margin-bottom: 16px;
+    min-height: 32px;
+  }
+  .victory-stars .star-off {
+    opacity: 0.2;
+    filter: grayscale(1);
+  }
   .victory-btn {
     font-family: 'IM Fell English SC', 'Georgia', serif;
     font-size: 17px;
@@ -1062,6 +1072,15 @@
   grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 10px;
   margin-bottom: 20px;
+}
+
+.level-stars {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-top: 3px;
+  min-height: 16px;
+  text-align: center;
 }
 
 .campaign-level {
