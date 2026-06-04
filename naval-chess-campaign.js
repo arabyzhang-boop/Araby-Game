@@ -304,9 +304,6 @@ function updateCampaignLevelButtons() {
     var btn = document.getElementById('lvl' + (i + 1));
     if (!btn) continue;
     btn.classList.remove('locked');
-    if (campaignCompletedLevels.indexOf(i + 1) >= 0) {
-      btn.classList.add('completed');
-    }
     // 更新星级显示
     var starEl = document.getElementById('lvl' + (i + 1) + 'Stars');
     if (starEl) {
@@ -314,7 +311,7 @@ function updateCampaignLevelButtons() {
       if (best > 0) {
         var html = '';
         for (var s = 1; s <= 3; s++) {
-          html += s <= best ? '⭐' : '<span style="opacity:0.25">⭐</span>';
+          html += s <= best ? '⭐' : '<span style="opacity:0.2">☆</span>';
         }
         starEl.innerHTML = html;
       } else {

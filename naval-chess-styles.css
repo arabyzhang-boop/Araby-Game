@@ -1076,11 +1076,12 @@
 
 .level-stars {
   display: block;
-  font-size: 12px;
-  letter-spacing: 1px;
-  margin-top: 3px;
-  min-height: 16px;
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-top: 4px;
+  min-height: 20px;
   text-align: center;
+  line-height: 1;
 }
 
 .campaign-level {
@@ -1109,15 +1110,6 @@
   cursor: not-allowed;
   pointer-events: none;
 }
-.campaign-level.completed {
-  border-color: #27ae60;
-  box-shadow: 0 3px 0 #1a5c30, 0 4px 8px rgba(0,0,0,0.3);
-}
-.campaign-level.completed::after {
-  content: ' ✓';
-  color: #27ae60;
-}
-
 .campaign-actions {
   display: flex;
   gap: 12px;
