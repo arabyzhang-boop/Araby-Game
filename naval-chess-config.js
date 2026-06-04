@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════
 
 // 更新版本时请修改此版本号（格式: YYMMDD-N）
-var APP_VERSION = '250603-7';
+var APP_VERSION = '250604-10';
 
 // ── 菜单控制 ──
 var gameMode = 'pvp'; // 'pvp' | 'ai'
@@ -90,6 +90,20 @@ var sharks = [];
 var mines = [];
 var minePlacementMode = false;
 var minePlacementShip = null;
+
+// ── 地形（关卡模式） ──
+var TERRAIN = {
+  MOUNTAIN: 'mountain',          // ⛰️ 山地：阻挡一切
+  SNOW_MOUNTAIN: 'snowMountain', // 🏔️ 雪山：同山地
+  CLOUD: 'cloud',                // 🌫️ 云雾：遮挡信息
+  LOW_ISLAND: 'lowIsland',       // 🏝️ 低海拔岛屿：阻挡移动但不阻挡远程
+  FLAG: 'flag',                  // 🚩 目标点：占据即胜利
+  SUPPLY: 'supply',              // ❤️ 补给点：占据恢复1HP
+  SHOAL: 'shoal',                // 浅滩：阻挡中/大型舰船（长度≥2）
+  MEDIUM_SHOAL: 'mediumShoal',   // 中浅滩：仅阻挡大型舰船（长度≥3）
+  POWDER_KEG: 'powderKeg'        // 火药桶：占据补充一次舷炮
+};
+var terrain = []; // { col, row, type }
 
 // ── AI 超时保护 ──
 var aiFailsafeTimer = null;

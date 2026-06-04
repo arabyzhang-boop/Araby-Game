@@ -153,7 +153,7 @@ resizeForMobile();
 
 function startGame() {
   gameOver = false;
-  sharks = []; mines = []; minePlacementMode = false;
+  sharks = []; mines = []; terrain = []; minePlacementMode = false;
   playerKills = [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
   btnEndTurn.disabled = false;
   btnReset.disabled = false;
@@ -441,7 +441,7 @@ btnEndTurn.addEventListener('click', function() {
 btnReset.addEventListener('click', function() {
   if (mpGameStarted) { surrenderGame(); return; }
   gameOver = false;
-  sharks = []; mines = []; minePlacementMode = false;
+  sharks = []; mines = []; terrain = []; minePlacementMode = false;
   playerKills = [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
   var vo2 = document.getElementById('victoryOverlay'); vo2.classList.add('hidden'); vo2.style.display = 'none';
   btnEndTurn.disabled = false;

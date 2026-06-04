@@ -653,6 +653,11 @@
     letter-spacing: 4px;
     color: var(--gold-light);
     margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .victory-title.defeat {
+    color: #a0a8b0;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
   .victory-faction {
     font-family: 'IM Fell English', 'Georgia', serif;

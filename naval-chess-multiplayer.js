@@ -217,13 +217,13 @@ function handleServerMessage(msg) {
 
     case 'opponentSurrendered':
       if (mpGameStarted && !gameOver) {
-        mpEndGame('对方投降！你获得了胜利');
+        mpEndGame('对方投降！你获得了胜利', true);
       }
       break;
 
     case 'opponentDisconnected':
       if (mpGameStarted && !gameOver) {
-        mpEndGame('对手已断开连接，你获得了胜利');
+        mpEndGame('对手已断开连接，你获得了胜利', true);
       }
       break;
 
@@ -657,22 +657,31 @@ function applyRemoteAction(action) {
 function surrenderGame() {
   if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
     mpSocket.send(JSON.stringify({ type: 'surrender' }));
-    mpEndGame('你已投降，对方获得胜利');
+    mpEndGame('你已投降，对方获得胜利', false);
   } else {
-    mpEndGame('连接已断开，游戏终止');
+    mpEndGame('连接已断开，游戏终止', false);
   }
 }
 
-function mpEndGame(msg) {
+function mpEndGame(msg, isWinner) {
   gameOver = true;
-  var pNames = ['葡萄牙帝国', '荷兰东印度公司'];
-  var winnerIdx = msg.indexOf('对方') >= 0 ? (1 - mpPlayerIndex) : mpPlayerIndex;
+  var winnerIdx = isWinner ? mpPlayerIndex : (1 - mpPlayerIndex);
   document.getElementById('victoryFaction').textContent = msg;
   document.getElementById('victoryTurnNum').textContent = currentTurn;
   document.getElementById('victoryShipsLeft').textContent = ships.filter(function(s) { return s.playerIndex === winnerIdx; }).length;
   document.getElementById('victoryRamKills').textContent = playerKills[winnerIdx] ? playerKills[winnerIdx].ram : 0;
   document.getElementById('victoryBroadsideKills').textContent = playerKills[winnerIdx] ? playerKills[winnerIdx].broadside : 0;
   document.getElementById('victoryBoardingKills').textContent = playerKills[winnerIdx] ? playerKills[winnerIdx].boarding : 0;
+
+  var titleEl = document.getElementById('victoryTitle');
+  if (isWinner) {
+    titleEl.textContent = 'VICTORY';
+    titleEl.classList.remove('defeat');
+  } else {
+    titleEl.textContent = 'DEFEAT';
+    titleEl.classList.add('defeat');
+  }
+
   document.getElementById('victoryOverlay').classList.remove('hidden');
   document.getElementById('victoryOverlay').style.display = 'flex';
   document.getElementById('btnEndTurn').disabled = true;

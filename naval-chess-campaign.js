@@ -3,6 +3,43 @@
 //  加载顺序：第9个（依赖 famous-ships.js, ai.js）
 // ═══════════════════════════════════════
 
+// ── 存档持久化 ──
+var CAMPAIGN_SAVE_KEY = 'navalChessCampaign_v1';
+
+function saveCampaignProgress() {
+  try {
+    var data = {
+      v: 1,
+      unlockedShips: campaignUnlockedShips,
+      completedLevels: campaignCompletedLevels
+    };
+    localStorage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(data));
+  } catch (e) {
+    // localStorage 不可用（无痕模式、配额满等），静默失败
+  }
+}
+
+function loadCampaignProgress() {
+  try {
+    var raw = localStorage.getItem(CAMPAIGN_SAVE_KEY);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (data.v === 1) {
+      campaignUnlockedShips = data.unlockedShips || [];
+      campaignCompletedLevels = data.completedLevels || [];
+    }
+  } catch (e) {
+    // 数据损坏则丢弃，保留默认空数组
+  }
+}
+
+// ── 地形批量生成辅助 ──
+function _tr(row, from, to, type) {
+  var arr = [];
+  for (var c = from; c <= to; c++) arr.push({ col: c, row: row, type: type });
+  return arr;
+}
+
 // ── 关卡定义 ──
 var campaignLevels = [
   { // 关卡 1
@@ -42,6 +79,53 @@ var campaignLevels = [
         skill: null, skillData: null }
     ],
     unlockShip: 4 // 通关解锁 famousShipLibrary[4] = 无畏号
+  },
+  { // 关卡 3 — 海峡交战（修订版）
+    id: 3,
+    aiShips: ['黄泉号'],
+    deployZone: { colMin: 0, colMax: 7, rowMin: 8, rowMax: 15, dirs: [DIR.N, DIR.E, DIR.S] },
+    enemyFleet: [
+      // 船头格→锚点：朝西时锚点col = 船头col + (length-1)
+      { name: '黄泉号', length: 3, col: 14, row: 7, direction: DIR.W,
+        skill: famousShipLibrary[8].skill, skillData: famousShipLibrary[8].skillData,
+        flagColor: famousShipLibrary[8].flagColor, flagShape: famousShipLibrary[8].flagShape,
+        flagIcon: famousShipLibrary[8].flagIcon, flagPattern: famousShipLibrary[8].flagPattern },
+      { name: '中型舰艇', length: 2, col: 14, row: 5, direction: DIR.W,
+        skill: null, skillData: null },
+      { name: '中型舰艇', length: 2, col: 14, row: 9, direction: DIR.W,
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 10, row: 8, direction: DIR.W,
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 11, row: 6, direction: DIR.W,
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 17, row: 6, direction: DIR.W,
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 17, row: 8, direction: DIR.W,
+        skill: null, skillData: null }
+    ],
+    terrain: [].concat(
+      // ═══ 雪山大陆（左上，冰盖向东收缩） ═══
+      _tr(0,0,19, TERRAIN.SNOW_MOUNTAIN), _tr(1,0,19, TERRAIN.SNOW_MOUNTAIN),
+      _tr(2,0,14, TERRAIN.SNOW_MOUNTAIN),
+      _tr(3,0,12, TERRAIN.SNOW_MOUNTAIN),
+      _tr(4,0,10, TERRAIN.SNOW_MOUNTAIN),
+      _tr(5,0,8, TERRAIN.SNOW_MOUNTAIN),
+      _tr(6,0,7, TERRAIN.SNOW_MOUNTAIN), _tr(7,2,7, TERRAIN.SNOW_MOUNTAIN),
+      _tr(8,4,7, TERRAIN.SNOW_MOUNTAIN),
+      _tr(9,5,7, TERRAIN.SNOW_MOUNTAIN),
+      // ═══ 山地大陆（右下，留出右侧开阔水域） ═══
+      _tr(10,11,12, TERRAIN.MOUNTAIN),
+      _tr(11,11,13, TERRAIN.MOUNTAIN),
+      _tr(12,8,16, TERRAIN.MOUNTAIN),
+      _tr(13,7,19, TERRAIN.MOUNTAIN),
+      _tr(14,5,19, TERRAIN.MOUNTAIN),
+      _tr(15,4,19, TERRAIN.MOUNTAIN),
+      _tr(16,3,19, TERRAIN.MOUNTAIN),
+      _tr(17,3,19, TERRAIN.MOUNTAIN),
+      _tr(18,1,19, TERRAIN.MOUNTAIN),
+      _tr(19,0,19, TERRAIN.MOUNTAIN)
+    ),
+    unlockShip: 8 // 通关解锁 famousShipLibrary[8] = 黄泉号
   }
 ];
 
@@ -131,45 +215,34 @@ function startCampaignLevel(levelId) {
 // ── 初始化关卡战斗 ──
 function initCampaignGame(redPicks) {
   gameOver = false;
-  sharks = [];
+  sharks = []; mines = []; minePlacementMode = false;
   playerKills = [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
   btnEndTurn.disabled = false;
   btnReset.disabled = false;
   ships = [];
   var level = campaignLevels[campaignLevelId - 1];
+  // 加载关卡地形
+  terrain = (level.terrain && level.terrain.length > 0) ? level.terrain.slice() : [];
 
   // 电脑舰队先部署（固定位置），确保后续玩家随机放置不会重叠
   var blueFleet = level.enemyFleet;
   for (var i = 0; i < blueFleet.length; i++) {
     var def = blueFleet[i];
-    var shipObj = {
+    ships.push(createShip({
       col: def.col, row: def.row, length: def.length, direction: def.direction,
-      playerIndex: 1, hp: def.length, maxHp: def.length,
-      actionsRemaining: 3, maxActions: 3,
-      boardingTargets: [], stepsMoved: 0, chargeSteps: 0,
-      broadsideCount: 0, maxBroadsideCount: def.skillData && def.skillData.turtleShip ? 0 : 1,
-      name: def.name || null, skill: def.skill || null,
-      skillData: def.skillData || null,
-      flagColor: def.flagColor || null, flagShape: def.flagShape || null,
-      flagIcon: def.flagIcon || null, flagPattern: def.flagPattern || null,
-      braveActive: false,
-      submerged: false, submergedTurns: 0, submergeUsed: false,
-      bowCannonUsed: false, greekFireUsed: false,
-      devourTarget: -1, devourProgress: 0, sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0
-    };
-    // 应用名船技能
-    if (def.skillData) {
-      var sd = def.skillData;
-      if (sd.sturdy) { shipObj.maxHp = def.length + 1; shipObj.hp = shipObj.maxHp; }
-      if (sd.speedy) { shipObj.maxActions = 4; shipObj.actionsRemaining = 4; }
-      if (sd.extraBroadside) shipObj.maxBroadsideCount = 2;
-    }
-    ships.push(shipObj);
+      playerIndex: 1,
+      name: def.name, skill: def.skill, skillData: def.skillData,
+      flagColor: def.flagColor, flagShape: def.flagShape,
+      flagIcon: def.flagIcon, flagPattern: def.flagPattern
+    }));
   }
 
   // 玩家舰队随机部署（此时敌舰已存在，placeFleet 的 isCellOccupied 会避开）
   var redFleet = (redPicks && redPicks.length > 0) ? redPicks : getDefaultFleet();
-  if (campaignLevelId >= 2) {
+  var dz = level.deployZone;
+  if (dz) {
+    placeFleet(redFleet, 0, dz.colMin, dz.colMax, dz.dirs, dz.rowMin, dz.rowMax);
+  } else if (campaignLevelId >= 2) {
     placeFleet(redFleet, 0, 5, 10, [DIR.N, DIR.E, DIR.S], 6, 15);
   } else {
     placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
@@ -200,8 +273,8 @@ function completeCurrentLevel() {
     campaignUnlockedShips.push(level.unlockShip);
     _pendingUnlockShip = famousShipLibrary[level.unlockShip]; // 延迟到结算窗口之后显示
   }
+  saveCampaignProgress();
   updateCampaignLevelButtons();
-  // 注意：inCampaign 在胜利返回菜单时才重置，保持胜利界面正常路由
 }
 
 // ── 显示名船解锁提示（结算窗口之后调用） ──
@@ -294,6 +367,7 @@ for (var li = 0; li < campaignLevels.length; li++) {
   }
 }
 
-// 初始化时刷新关卡和名船库
+// 初始化时载入存档并刷新UI
+loadCampaignProgress();
 updateCampaignLevelButtons();
 updateLibraryDisplay();

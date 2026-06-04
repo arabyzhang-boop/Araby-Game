@@ -20,6 +20,8 @@ function snapshotState() {
       submergeUsed: s.submergeUsed, bowCannonUsed: s.bowCannonUsed,
       greekFireUsed: s.greekFireUsed, devourTarget: s.devourTarget,
       devourProgress: s.devourProgress, sharksUsed: s.sharksUsed,
+      minesPlaced: s.minesPlaced, ironArmorMoves: s.ironArmorMoves,
+      supplyUsed: s.supplyUsed,
       skillData: s.skillData, name: s.name, skill: s.skill,
       flagColor: s.flagColor, flagShape: s.flagShape,
       flagIcon: s.flagIcon, flagPattern: s.flagPattern
@@ -33,8 +35,16 @@ function snapshotState() {
   for (var k = 0; k < hitEffects.length; k++) {
     hh.push({ col: hitEffects[k].col, row: hitEffects[k].row, emoji: hitEffects[k].emoji, endTime: hitEffects[k].endTime });
   }
+  var mm = [];
+  for (var m = 0; m < mines.length; m++) {
+    mm.push({ col: mines[m].col, row: mines[m].row });
+  }
+  var tt = [];
+  for (var t = 0; t < terrain.length; t++) {
+    tt.push({ col: terrain[t].col, row: terrain[t].row, type: terrain[t].type });
+  }
   return {
-    ships: ss, sharks: sh, currentPlayerIndex: currentPlayerIndex,
+    ships: ss, sharks: sh, mines: mm, terrain: tt, currentPlayerIndex: currentPlayerIndex,
     currentTurn: currentTurn, gameOver: gameOver,
     playerKills: [
       { ram: playerKills[0].ram, broadside: playerKills[0].broadside, boarding: playerKills[0].boarding },
@@ -61,6 +71,8 @@ function restoreState(snap) {
       submergeUsed: s.submergeUsed, bowCannonUsed: s.bowCannonUsed,
       greekFireUsed: s.greekFireUsed, devourTarget: s.devourTarget,
       devourProgress: s.devourProgress, sharksUsed: s.sharksUsed,
+      minesPlaced: s.minesPlaced, ironArmorMoves: s.ironArmorMoves,
+      supplyUsed: s.supplyUsed,
       skillData: s.skillData, name: s.name, skill: s.skill,
       flagColor: s.flagColor, flagShape: s.flagShape,
       flagIcon: s.flagIcon, flagPattern: s.flagPattern
@@ -81,6 +93,18 @@ function restoreState(snap) {
   hitEffects = [];
   for (var k = 0; k < snap.hitEffects.length; k++) {
     hitEffects.push({ col: snap.hitEffects[k].col, row: snap.hitEffects[k].row, emoji: snap.hitEffects[k].emoji, endTime: snap.hitEffects[k].endTime });
+  }
+  mines = [];
+  if (snap.mines) {
+    for (var m = 0; m < snap.mines.length; m++) {
+      mines.push({ col: snap.mines[m].col, row: snap.mines[m].row });
+    }
+  }
+  terrain = [];
+  if (snap.terrain) {
+    for (var t = 0; t < snap.terrain.length; t++) {
+      terrain.push({ col: snap.terrain[t].col, row: snap.terrain[t].row, type: snap.terrain[t].type });
+    }
   }
 }
 
@@ -105,7 +129,8 @@ function _simCellsAt(ship, hc, hr) {
   return cells;
 }
 
-function _simOccupied(col, row, exclIdx) {
+function _simOccupied(col, row, exclIdx, optShipLength) {
+  if (isTerrainBlocking(col, row, optShipLength)) return true;
   for (var i = 0; i < ships.length; i++) {
     if (i === exclIdx) continue;
     if (ships[i].submerged) continue;
@@ -276,6 +301,48 @@ function _simCheckVictory() {
   return -1;
 }
 
+// ── 静默水雷碰撞检测（模拟用） ──
+function _simCheckMineCollision(cells, shipIdx) {
+  if (mines.length === 0) return false;
+  var ship = ships[shipIdx];
+  for (var mi = mines.length - 1; mi >= 0; mi--) {
+    for (var ci = 0; ci < cells.length; ci++) {
+      if (mines[mi].col === cells[ci].col && mines[mi].row === cells[ci].row) {
+        ship.hp--;
+        mines.splice(mi, 1);
+        if (ship.hp <= 0) { _simRemoveShip(shipIdx); _simCheckVictory(); return true; }
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+// ── 静默地形效果（模拟用） ──
+function _simProcessTerrainEffects(shipIdx) {
+  if (terrain.length === 0) return false;
+  var ship = ships[shipIdx];
+  var cells = _simCells(ship);
+  for (var ci = 0; ci < cells.length; ci++) {
+    var t = getTerrainAt(cells[ci].col, cells[ci].row);
+    if (!t) continue;
+    if (t.type === TERRAIN.FLAG) {
+      gameOver = true; return true;
+    }
+    if (t.type === TERRAIN.SUPPLY && ship.hp < ship.maxHp) {
+      ship.hp++;
+      terrain.splice(terrain.indexOf(t), 1);
+      return false;
+    }
+    if (t.type === TERRAIN.POWDER_KEG && ship.broadsideCount > 0) {
+      ship.broadsideCount--;
+      terrain.splice(terrain.indexOf(t), 1);
+      return false;
+    }
+  }
+  return false;
+}
+
 // ── 静默行动函数（不写日志、不渲染） ──
 
 function _simMoveForward(shipIdx) {
@@ -287,11 +354,11 @@ function _simMoveForward(shipIdx) {
   var cells = _simCellsAt(ship, newCol, newRow);
   for (var ci = 0; ci < cells.length; ci++) {
     if (cells[ci].col < 0 || cells[ci].col >= GRID_SIZE || cells[ci].row < 0 || cells[ci].row >= GRID_SIZE) return false;
-    if (_simOccupied(cells[ci].col, cells[ci].row, shipIdx)) return false;
+    if (_simOccupied(cells[ci].col, cells[ci].row, shipIdx, ship.length)) return false;
   }
   ship.col = newCol; ship.row = newRow;
   ship.stepsMoved += step; ship.chargeSteps += step;
-  // 鲨鱼碰撞
+  // 鲨鱼/水雷碰撞
   if (!ship.submerged && !(ship.skillData && ship.skillData.canReleaseSharks)) {
     var sc = _simCells(ship);
     for (var si = sharks.length - 1; si >= 0; si--) {
@@ -303,7 +370,9 @@ function _simMoveForward(shipIdx) {
         }
       }
     }
+    if (_simCheckMineCollision(sc, shipIdx)) return true;
   }
+  if (_simProcessTerrainEffects(shipIdx)) { _simCheckVictory(); return true; }
   ship.actionsRemaining--;
   return true;
 }
@@ -318,12 +387,12 @@ function _simTurn(shipIdx, delta) {
       var cx = ship.col + newDv.dx * i;
       var cy = ship.row + newDv.dy * i;
       if (cx < 0 || cx >= GRID_SIZE || cy < 0 || cy >= GRID_SIZE) return false;
-      if (_simOccupied(cx, cy, shipIdx)) return false;
+      if (_simOccupied(cx, cy, shipIdx, ship.length)) return false;
     }
     var swept = _simSweptCells(ship, newDir);
     for (var si = 0; si < swept.length; si++) {
       if (swept[si].col < 0 || swept[si].col >= GRID_SIZE || swept[si].row < 0 || swept[si].row >= GRID_SIZE) return false;
-      if (_simOccupied(swept[si].col, swept[si].row, shipIdx)) return false;
+      if (_simOccupied(swept[si].col, swept[si].row, shipIdx, ship.length)) return false;
     }
   }
   ship.direction = newDir;
@@ -339,7 +408,9 @@ function _simTurn(shipIdx, delta) {
         }
       }
     }
+    if (_simCheckMineCollision(sw2, shipIdx)) return true;
   }
+  if (_simProcessTerrainEffects(shipIdx)) { _simCheckVictory(); return true; }
   ship.actionsRemaining -= ship.length;
   return true;
 }
@@ -360,9 +431,10 @@ function _simBroadside(shipIdx) {
         var tc = ox + sdir.dx * r;
         var tr = oy + sdir.dy * r;
         if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+        if (isTerrainBlockingRanged(tc, tr)) break; // 山地阻挡
         var hi = _simFindShipAt(tc, tr);
         if (hi >= 0) {
-          if (r === 1 && !(ships[hi].skillData && ships[hi].skillData.stealth && !_simAdjacentToEnemy(hi))) {
+          if (r === 1) {
             selfDmg++;
           }
           if (!(ships[hi].skillData && ships[hi].skillData.stealth && !_simAdjacentToEnemy(hi))) {
@@ -413,7 +485,8 @@ function _simRam(shipIdx) {
   var dv = DIR_VECTORS[ship.direction];
   ship.col += dv.dx; ship.row += dv.dy;
   ship.stepsMoved++; ship.chargeSteps++;
-  // shark check
+  if (_simProcessTerrainEffects(shipIdx)) { _simCheckVictory(); return true; }
+  // shark / mine check
   if (!(ship.skillData && ship.skillData.canReleaseSharks)) {
     var sc = _simCells(ship);
     for (var si = sharks.length - 1; si >= 0; si--) {
@@ -425,6 +498,7 @@ function _simRam(shipIdx) {
         }
       }
     }
+    if (_simCheckMineCollision(sc, shipIdx)) return true;
   }
   var dmg = ship.chargeSteps;
   var eDv = DIR_VECTORS[enemy.direction];
@@ -440,7 +514,7 @@ function _simRam(shipIdx) {
     var blocked = false;
     for (var ci = 0; ci < ec2.length; ci++) {
       if (ec2[ci].col < 0 || ec2[ci].col >= GRID_SIZE || ec2[ci].row < 0 || ec2[ci].row >= GRID_SIZE) { blocked = true; break; }
-      if (_simOccupied(ec2[ci].col, ec2[ci].row, targetIdx)) { blocked = true; break; }
+      if (_simOccupied(ec2[ci].col, ec2[ci].row, targetIdx, enemy.length)) { blocked = true; break; }
     }
     if (blocked) break;
     enemy.col = nc2; enemy.row = nr2;
@@ -516,6 +590,7 @@ function _simSkill(shipIdx, skillType) {
       var tc = bowCol + dv.dx * r;
       var tr = bowRow + dv.dy * r;
       if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+      if (isTerrainBlockingRanged(tc, tr)) break;
       var hi = _simFindShipAt(tc, tr);
       if (hi >= 0 && hi !== shipIdx) {
         if (r === 1) selfDmg = 1;
@@ -541,6 +616,7 @@ function _simSkill(shipIdx, skillType) {
       var tc2 = bc2 + dv2.dx * r2;
       var tr2 = br2 + dv2.dy * r2;
       if (tc2 < 0 || tc2 >= GRID_SIZE || tr2 < 0 || tr2 >= GRID_SIZE) break;
+      if (isTerrainBlockingRanged(tc2, tr2)) break;
       var hi2 = _simFindShipAt(tc2, tr2);
       if (hi2 >= 0 && hi2 !== shipIdx) {
         if (ships[hi2].playerIndex !== ship.playerIndex) ships[hi2].hp--;
@@ -609,7 +685,7 @@ function getLegalActions(playerIdx) {
     var canMove = true;
     for (var ci = 0; ci < cells.length; ci++) {
       if (cells[ci].col < 0 || cells[ci].col >= GRID_SIZE || cells[ci].row < 0 || cells[ci].row >= GRID_SIZE) { canMove = false; break; }
-      if (_simOccupied(cells[ci].col, cells[ci].row, i)) { canMove = false; break; }
+      if (_simOccupied(cells[ci].col, cells[ci].row, i, ship.length)) { canMove = false; break; }
     }
     if (canMove) actions.push({ type: 'move', shipIdx: sid });
 
@@ -624,13 +700,13 @@ function getLegalActions(playerIdx) {
             var tx = ship.col + ndv.dx * ti;
             var ty = ship.row + ndv.dy * ti;
             if (tx < 0 || tx >= GRID_SIZE || ty < 0 || ty >= GRID_SIZE) { turnOk = false; break; }
-            if (_simOccupied(tx, ty, i)) { turnOk = false; break; }
+            if (_simOccupied(tx, ty, i, ship.length)) { turnOk = false; break; }
           }
           if (turnOk) {
             var sw = _simSweptCells(ship, nd);
             for (var si = 0; si < sw.length; si++) {
               if (sw[si].col < 0 || sw[si].col >= GRID_SIZE || sw[si].row < 0 || sw[si].row >= GRID_SIZE) { turnOk = false; break; }
-              if (_simOccupied(sw[si].col, sw[si].row, i)) { turnOk = false; break; }
+              if (_simOccupied(sw[si].col, sw[si].row, i, ship.length)) { turnOk = false; break; }
             }
           }
         }
@@ -689,6 +765,7 @@ function getLegalActions(playerIdx) {
           var tc = ship.col + dv.dx * (ship.length - 1 + r);
           var tr = ship.row + dv.dy * (ship.length - 1 + r);
           if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+          if (isTerrainBlockingRanged(tc, tr)) break;
           var fi2 = _simFindShipAt(tc, tr);
           if (fi2 >= 0 && ships[fi2].playerIndex !== ship.playerIndex) { hasTarget = true; break; }
         }
@@ -701,6 +778,7 @@ function getLegalActions(playerIdx) {
           var tc2 = ship.col + dv.dx * (ship.length - 1 + r2);
           var tr2 = ship.row + dv.dy * (ship.length - 1 + r2);
           if (tc2 < 0 || tc2 >= GRID_SIZE || tr2 < 0 || tr2 >= GRID_SIZE) break;
+          if (isTerrainBlockingRanged(tc2, tr2)) break;
           var fi = _simFindShipAt(tc2, tr2);
           if (fi >= 0 && ships[fi].playerIndex !== ship.playerIndex) { hasTarget2 = true; break; }
         }
@@ -774,6 +852,7 @@ function executeSimAction(action) {
       if (sh.justSpawned) { sh.justSpawned = false; surv.push(sh); continue; }
       sh.col += sh.dx; sh.row += sh.dy;
       if (sh.col < 0 || sh.col >= GRID_SIZE || sh.row < 0 || sh.row >= GRID_SIZE) continue;
+      if (isTerrainBlocking(sh.col, sh.row)) continue;
       var hi = _simFindShipAt(sh.col, sh.row);
       if (hi >= 0) {
         if (!(ships[hi].skillData && ships[hi].skillData.canReleaseSharks)) {
@@ -803,6 +882,7 @@ function _simCountBroadside(ship) {
       for (var r = 1; r <= 2; r++) {
         var tc = ox + sides[sd].dx * r, tr = oy + sides[sd].dy * r;
         if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+        if (isTerrainBlockingRanged(tc, tr)) break;
         var hi = _simFindShipAt(tc, tr);
         if (hi >= 0) {
           if (ships[hi].playerIndex !== ship.playerIndex) enemyHits++;

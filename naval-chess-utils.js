@@ -34,13 +34,131 @@ function getShipCellsAt(ship, headCol, headRow) {
   return cells;
 }
 
-/** 检查某个格子是否被其他舰船占据（排除 excludeIndex） */
-function isCellOccupied(col, row, excludeIndex) {
+/** 检查某个格子是否被其他舰船占据（排除 excludeIndex，含不可通过地形） */
+function isCellOccupied(col, row, excludeIndex, optShipLength) {
+  if (isTerrainBlocking(col, row, optShipLength)) return true;
   return ships.some(function(ship, idx) {
     if (idx === excludeIndex) return false;
     if (ship.submerged) return false;
     return getShipCells(ship).some(function(c) { return c.col === col && c.row === row; });
   });
+}
+
+// ── 地形查询辅助 ──
+
+/** 查找指定坐标的地形对象，无则返回 null */
+function getTerrainAt(col, row) {
+  for (var i = 0; i < terrain.length; i++) {
+    if (terrain[i].col === col && terrain[i].row === row) return terrain[i];
+  }
+  return null;
+}
+
+/** 该格地形是否阻挡移动（含下潜）和鲨鱼。optShipLength 用于浅滩/中浅滩判断 */
+function isTerrainBlocking(col, row, optShipLength) {
+  var t = getTerrainAt(col, row);
+  if (!t) return false;
+  // 始终阻挡所有舰船的地形
+  if (t.type === TERRAIN.MOUNTAIN || t.type === TERRAIN.SNOW_MOUNTAIN ||
+      t.type === TERRAIN.LOW_ISLAND || t.type === TERRAIN.FLAG ||
+      t.type === TERRAIN.SUPPLY || t.type === TERRAIN.POWDER_KEG) return true;
+  // 尺寸依赖地形（仅当传入舰船长度时才判断）
+  if (optShipLength != null) {
+    if (t.type === TERRAIN.SHOAL && optShipLength >= 2) return true;
+    if (t.type === TERRAIN.MEDIUM_SHOAL && optShipLength >= 3) return true;
+  }
+  return false;
+}
+
+/** 该格地形是否阻挡远程火力（仅山地/雪山） */
+function isTerrainBlockingRanged(col, row) {
+  var t = getTerrainAt(col, row);
+  if (!t) return false;
+  return t.type === TERRAIN.MOUNTAIN || t.type === TERRAIN.SNOW_MOUNTAIN;
+}
+
+/** 该格是否处于云雾区内 */
+function isCellInFog(col, row) {
+  var t = getTerrainAt(col, row);
+  return t && t.type === TERRAIN.CLOUD;
+}
+
+/** 检查一艘船的所有格子是否全部在云雾区内 */
+function isShipInFog(ship) {
+  if (terrain.length === 0) return false;
+  var cells = getShipCells(ship);
+  for (var i = 0; i < cells.length; i++) {
+    if (!isCellInFog(cells[i].col, cells[i].row)) return false;
+  }
+  return true;
+}
+
+/** 检查给定格子列表中是否有任意格处于云雾区外 */
+function hasCellOutsideFog(cells) {
+  if (terrain.length === 0) return true;
+  for (var i = 0; i < cells.length; i++) {
+    if (!isCellInFog(cells[i].col, cells[i].row)) return true;
+  }
+  return false;
+}
+
+// ── 交互地形效果（占据时触发，在 afterShipAction 中调用） ──
+
+/** 检测舰船所在格是否有交互地形，执行对应效果。返回 true 表示触发了胜利 */
+function processTerrainEffects(ship) {
+  if (terrain.length === 0 || !ship) return false;
+  var cells = getShipCells(ship);
+  var shipIdx = ships.indexOf(ship);
+  var shipNameStr = shipName(shipIdx);
+
+  for (var ci = 0; ci < cells.length; ci++) {
+    var t = getTerrainAt(cells[ci].col, cells[ci].row);
+    if (!t) continue;
+
+    if (t.type === TERRAIN.FLAG) {
+      gameOver = true;
+      var pNames = ['葡萄牙帝国', '荷兰东印度公司'];
+      document.getElementById('victoryFaction').textContent = pNames[ship.playerIndex] + ' 占领了目标点';
+      document.getElementById('victoryTitle').textContent = 'VICTORY';
+      document.getElementById('victoryTitle').classList.remove('defeat');
+      var vo = document.getElementById('victoryOverlay');
+      vo.classList.remove('hidden'); vo.style.display = 'flex';
+      btnEndTurn.disabled = true; btnReset.disabled = true;
+      log('🚩 ' + shipNameStr + ' 占据目标点，' + pNames[ship.playerIndex] + ' 获得胜利！');
+      updateInfoPanel(); render();
+      if (inCampaign && ship.playerIndex === 0) completeCurrentLevel();
+      return true;
+    }
+
+    if (t.type === TERRAIN.SUPPLY && ship.hp < ship.maxHp) {
+      ship.hp++;
+      addHitEffect(t.col, t.row, '❤️‍🩹');
+      log(shipNameStr + ' 占据补给点，回复1点生命（' + ship.hp + '/' + ship.maxHp + '）');
+      removeTerrainAt(t.col, t.row);
+      render();
+      break;
+    }
+
+    if (t.type === TERRAIN.POWDER_KEG && ship.broadsideCount > 0) {
+      ship.broadsideCount--;
+      addHitEffect(t.col, t.row, '💥');
+      log(shipNameStr + ' 获得火药桶，补充一次舷炮（剩余 ' + (ship.maxBroadsideCount - ship.broadsideCount) + ' 次）');
+      removeTerrainAt(t.col, t.row);
+      render();
+      break;
+    }
+  }
+  return false;
+}
+
+/** 移除指定坐标的地形 */
+function removeTerrainAt(col, row) {
+  for (var i = 0; i < terrain.length; i++) {
+    if (terrain[i].col === col && terrain[i].row === row) {
+      terrain.splice(i, 1);
+      return;
+    }
+  }
 }
 
 // ── 坐标转换 ──
@@ -85,6 +203,40 @@ function logSink(victimIdx, killerIdx, method) {
 // ── 获取舰船转向消耗 ──
 function getTurnCost(ship) {
   return ship.length;
+}
+
+// ── 舰船对象工厂（统一初始化，避免多处重复） ──
+// props 必须包含: col, row, length, direction, playerIndex
+// 可选: name, skill, skillData, flagColor, flagShape, flagIcon, flagPattern, hp, maxHp, actionsRemaining, maxActions
+function createShip(props) {
+  var sd = props.skillData || null;
+  var ship = {
+    col: props.col, row: props.row, length: props.length, direction: props.direction,
+    playerIndex: props.playerIndex,
+    hp: props.hp != null ? props.hp : props.length,
+    maxHp: props.maxHp != null ? props.maxHp : props.length,
+    actionsRemaining: props.actionsRemaining != null ? props.actionsRemaining : 3,
+    maxActions: props.maxActions != null ? props.maxActions : 3,
+    boardingTargets: [], stepsMoved: 0, chargeSteps: 0,
+    broadsideCount: 0,
+    maxBroadsideCount: (sd && sd.turtleShip) ? 0 : 1,
+    name: props.name || null, skill: props.skill || null,
+    skillData: sd,
+    flagColor: props.flagColor || null, flagShape: props.flagShape || null,
+    flagIcon: props.flagIcon || null, flagPattern: props.flagPattern || null,
+    braveActive: false,
+    submerged: false, submergedTurns: 0, submergeUsed: false,
+    bowCannonUsed: false, greekFireUsed: false,
+    devourTarget: -1, devourProgress: 0,
+    sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0
+  };
+  // 应用名船被动技能
+  if (sd) {
+    if (sd.sturdy) { ship.maxHp = ship.length + 1; ship.hp = ship.maxHp; }
+    if (sd.speedy) { ship.maxActions = 4; ship.actionsRemaining = 4; }
+    if (sd.extraBroadside) ship.maxBroadsideCount = 2;
+  }
+  return ship;
 }
 
 // ── 检查舰船是否与敌方舰船相邻（正交） ──

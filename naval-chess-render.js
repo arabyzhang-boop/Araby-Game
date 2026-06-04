@@ -307,14 +307,212 @@ function drawSelectionHighlight(ship) {
   ctx.restore();
 }
 
+// ── 地形渲染 ──
+function drawTerrain() {
+  if (terrain.length === 0) return;
+  for (var i = 0; i < terrain.length; i++) {
+    var t = terrain[i];
+    if (t.type === TERRAIN.CLOUD) continue;
+    var cx = t.col * CELL_SIZE + CELL_SIZE / 2;
+    var cy = t.row * CELL_SIZE + CELL_SIZE / 2;
+
+    if (t.type === TERRAIN.SHOAL) {
+      drawShoal(t.col, t.row);
+    } else if (t.type === TERRAIN.MEDIUM_SHOAL) {
+      drawMediumShoal(t.col, t.row);
+    } else if (t.type === TERRAIN.POWDER_KEG) {
+      drawPowderKeg(t.col, t.row);
+    } else if (t.type === TERRAIN.SUPPLY) {
+      drawSupplyPoint(t.col, t.row);
+    } else if (t.type === TERRAIN.FLAG) {
+      drawFlagPoint(t.col, t.row);
+    } else {
+      // 山地/雪山/岛屿使用 emoji
+      var emojiMap = {};
+      emojiMap[TERRAIN.MOUNTAIN] = '⛰️';
+      emojiMap[TERRAIN.SNOW_MOUNTAIN] = '🏔️';
+      emojiMap[TERRAIN.LOW_ISLAND] = '🏝️';
+      var emoji = emojiMap[t.type] || '⛰️';
+      ctx.save();
+      ctx.font = (CELL_SIZE - 4) + 'px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, cx, cy);
+      ctx.restore();
+    }
+  }
+}
+
+// ── 浅滩（沙底 + 3颗暗礁石，阻挡中/大型船） ──
+function drawShoal(col, row) {
+  var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
+  ctx.save();
+  // 沙色底色
+  ctx.fillStyle = '#cfbe98';
+  ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
+  // 水纹
+  ctx.strokeStyle = 'rgba(139, 115, 85, 0.5)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y + s * 0.45);
+  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.3, x + s - 5, y + s * 0.45);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y + s * 0.7);
+  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.55, x + s - 4, y + s * 0.7);
+  ctx.stroke();
+  // 3颗礁石（三角排列）
+  var dots = [
+    { dx: 0.35, dy: 0.38, r: 2.2 },
+    { dx: 0.65, dy: 0.38, r: 2.2 },
+    { dx: 0.50, dy: 0.65, r: 2.5 }
+  ];
+  ctx.fillStyle = '#6b5640';
+  for (var di = 0; di < dots.length; di++) {
+    ctx.beginPath();
+    ctx.arc(x + s * dots[di].dx, y + s * dots[di].dy, dots[di].r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// ── 中浅滩（更浅的沙底 + 1颗小礁石，仅阻挡大型船） ──
+function drawMediumShoal(col, row) {
+  var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
+  ctx.save();
+  // 更浅的沙色
+  ctx.fillStyle = '#ddd0b8';
+  ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
+  // 单条水纹
+  ctx.strokeStyle = 'rgba(139, 115, 85, 0.35)';
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(x + 5, y + s * 0.5);
+  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.38, x + s - 5, y + s * 0.5);
+  ctx.stroke();
+  // 1颗小礁石
+  ctx.fillStyle = '#8b7355';
+  ctx.beginPath();
+  ctx.arc(x + s * 0.5, y + s * 0.62, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── 火药桶（木桶 + 铁箍 + 火花） ──
+function drawPowderKeg(col, row) {
+  var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
+  var cx = x + s / 2, cy = y + s / 2;
+  ctx.save();
+  // 桶身（圆角矩形）
+  var bw = s * 0.45, bh = s * 0.5;
+  var bx = cx - bw, by = cy - bh;
+  ctx.fillStyle = '#8b5e3c';
+  ctx.strokeStyle = '#5d3a1a';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(bx + 3, by);
+  ctx.lineTo(bx + bw * 2 - 3, by);
+  ctx.quadraticCurveTo(bx + bw * 2, by, bx + bw * 2, by + 3);
+  ctx.lineTo(bx + bw * 2, by + bh * 2 - 3);
+  ctx.quadraticCurveTo(bx + bw * 2, by + bh * 2, bx + bw * 2 - 3, by + bh * 2);
+  ctx.lineTo(bx + 3, by + bh * 2);
+  ctx.quadraticCurveTo(bx, by + bh * 2, bx, by + bh * 2 - 3);
+  ctx.lineTo(bx, by + 3);
+  ctx.quadraticCurveTo(bx, by, bx + 3, by);
+  ctx.fill();
+  ctx.stroke();
+  // 铁箍（两条横线）
+  ctx.strokeStyle = '#3a2210';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(bx + 1, by + bh * 0.65);
+  ctx.lineTo(bx + bw * 2 - 1, by + bh * 0.65);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(bx + 1, by + bh * 1.35);
+  ctx.lineTo(bx + bw * 2 - 1, by + bh * 1.35);
+  ctx.stroke();
+  // 火花（顶部橙色小三角）
+  ctx.fillStyle = '#f39c12';
+  ctx.beginPath();
+  ctx.moveTo(cx, by - 2);
+  ctx.lineTo(cx - 3, by - 7);
+  ctx.lineTo(cx + 3, by - 7);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── 补给点（红心 + 十字） ──
+function drawSupplyPoint(col, row) {
+  var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
+  var cx = x + s / 2, cy = y + s / 2;
+  ctx.save();
+  // 红色圆形底
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.arc(cx, cy, s * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+  // 白色十字
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 5);
+  ctx.lineTo(cx, cy + 5);
+  ctx.moveTo(cx - 5, cy);
+  ctx.lineTo(cx + 5, cy);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ── 目标点（旗帜标志） ──
+function drawFlagPoint(col, row) {
+  var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
+  ctx.save();
+  // 旗杆
+  ctx.strokeStyle = '#3e2723';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(x + s * 0.35, y + s * 0.8);
+  ctx.lineTo(x + s * 0.35, y + s * 0.2);
+  ctx.stroke();
+  // 红旗（三角）
+  ctx.fillStyle = '#e74c3c';
+  ctx.beginPath();
+  ctx.moveTo(x + s * 0.35, y + s * 0.2);
+  ctx.lineTo(x + s * 0.8, y + s * 0.35);
+  ctx.lineTo(x + s * 0.35, y + s * 0.5);
+  ctx.fill();
+  ctx.restore();
+}
+
+// ── 云雾遮罩（半透明，盖在舰船上方） ──
+function drawFogOverlay() {
+  if (terrain.length === 0) return;
+  var hasFog = false;
+  for (var i = 0; i < terrain.length; i++) {
+    if (terrain[i].type === TERRAIN.CLOUD) { hasFog = true; break; }
+  }
+  if (!hasFog) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(220, 225, 235, 0.55)';
+  for (var i = 0; i < terrain.length; i++) {
+    var t = terrain[i];
+    if (t.type !== TERRAIN.CLOUD) continue;
+    ctx.fillRect(t.col * CELL_SIZE, t.row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+  }
+  ctx.restore();
+}
+
 function render() {
   drawGrid();
+  drawTerrain();
   ships.forEach(function(ship) { drawShip(ship); });
   if (selectedShipIndex >= 0 && selectedShipIndex < ships.length) {
     drawSelectionHighlight(ships[selectedShipIndex]);
   }
   drawSharks();
   drawMines();
+  drawFogOverlay();
   drawHitEffects();
 }
 

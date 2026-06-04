@@ -183,6 +183,23 @@ function checkVictory() {
       document.getElementById('victoryRamKills').textContent = kills.ram;
       document.getElementById('victoryBroadsideKills').textContent = kills.broadside;
       document.getElementById('victoryBoardingKills').textContent = kills.boarding;
+
+      // 确定本地玩家是胜是败
+      var isLocalWinner = true; // 本地双人共享屏幕，默认显示 VICTORY
+      if (mpGameStarted) {
+        isLocalWinner = (winner === mpPlayerIndex);
+      } else if (gameMode === 'ai' || inCampaign) {
+        isLocalWinner = (winner === 0);
+      }
+      var titleEl = document.getElementById('victoryTitle');
+      if (isLocalWinner) {
+        titleEl.textContent = 'VICTORY';
+        titleEl.classList.remove('defeat');
+      } else {
+        titleEl.textContent = 'DEFEAT';
+        titleEl.classList.add('defeat');
+      }
+
       var vo = document.getElementById('victoryOverlay');
       vo.classList.remove('hidden');
       vo.style.display = 'flex';
@@ -251,6 +268,8 @@ function moveSharks() {
     shark.row += shark.dy;
     // 越界消失
     if (shark.col < 0 || shark.col >= GRID_SIZE || shark.row < 0 || shark.row >= GRID_SIZE) continue;
+    // 地形阻挡（山地/雪山/岛屿阻挡鲨鱼）
+    if (isTerrainBlocking(shark.col, shark.row)) continue;
     // 撞击检查
     var hitIdx = findShipAt(shark.col, shark.row);
     if (hitIdx >= 0) {
@@ -499,7 +518,7 @@ function pushShip(ship, shipIndex, dx, dy, maxSteps) {
     var blocked = false;
     for (const c of newCells) {
       if (c.col < 0 || c.col >= GRID_SIZE || c.row < 0 || c.row >= GRID_SIZE) { blocked = true; break; }
-      if (isCellOccupied(c.col, c.row, shipIndex)) { blocked = true; break; }
+      if (isCellOccupied(c.col, c.row, shipIndex, ship.length)) { blocked = true; break; }
     }
     if (blocked) break;
     steps = s;

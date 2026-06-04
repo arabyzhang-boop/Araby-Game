@@ -40,44 +40,16 @@ function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinO
         const cx = col + dv.dx * i;
         const cy = row + dv.dy * i;
         if (cx < 0 || cx >= GRID_SIZE || cy < 0 || cy >= GRID_SIZE) { valid = false; break; }
-        if (isCellInFleet(cx, cy) || isCellAdjacentToFleet(cx, cy, playerIndex)) { valid = false; break; }
+        if (isCellInFleet(cx, cy) || isCellAdjacentToFleet(cx, cy, playerIndex) || isTerrainBlocking(cx, cy)) { valid = false; break; }
         cells.push({ col: cx, row: cy });
       }
       if (valid) {
-        var shipObj = {
+        ships.push(createShip({
           col: col, row: row, length: def.length, direction: dir, playerIndex: playerIndex,
-          hp: def.length, maxHp: def.length,
-          actionsRemaining: 3, maxActions: 3,
-          boardingTargets: [], stepsMoved: 0, chargeSteps: 0,
-          broadsideCount: 0, maxBroadsideCount: def.skillData && def.skillData.turtleShip ? 0 : 1,
-          name: def.name || null, skill: def.skill || null,
-          skillData: def.skillData || null,
-          flagColor: def.flagColor || null, flagShape: def.flagShape || null,
-          flagIcon: def.flagIcon || null, flagPattern: def.flagPattern || null,
-          braveActive: false,
-          submerged: false, submergedTurns: 0, submergeUsed: false,
-          bowCannonUsed: false, greekFireUsed: false,
-          devourTarget: -1, devourProgress: 0,
-          sharksUsed: false, ironArmorMoves: 0,
-          minesPlaced: 0, supplyUsed: 0
-        };
-        // 应用名船技能效果
-        if (def.skillData) {
-          var sd = def.skillData;
-          if (sd.sturdy) {
-            shipObj.maxHp = def.length + 1;
-            shipObj.hp = shipObj.maxHp;
-          }
-          if (sd.speedy) {
-            shipObj.maxActions = 4;
-            shipObj.actionsRemaining = 4;
-          }
-          if (sd.extraBroadside) {
-            shipObj.maxBroadsideCount = 2;
-          }
-          // brave 由接舷战时动态激活，此处不做初始设置
-        }
-        ships.push(shipObj);
+          name: def.name, skill: def.skill, skillData: def.skillData,
+          flagColor: def.flagColor, flagShape: def.flagShape,
+          flagIcon: def.flagIcon, flagPattern: def.flagPattern
+        }));
         placed = true;
         break;
       }

@@ -8,7 +8,12 @@ function afterShipAction(ship, actionDesc, cost) {
   if (gameOver) return;
 
   ship.actionsRemaining -= cost;
-  log(`${actionDesc}（消耗 ${cost}），剩余行动 ${ship.actionsRemaining}`);
+  if (!isShipInFog(ship)) {
+    log(`${actionDesc}（消耗 ${cost}），剩余行动 ${ship.actionsRemaining}`);
+  }
+
+  // 交互地形效果（目标点/补给点/火药桶）
+  if (processTerrainEffects(ship)) return;
 
   // 多人联机：仅本地行动才发送到对手（远程执行不重复发送）
   if (mpGameStarted && !mpRemoteExec && mpPendingAction) {
@@ -83,8 +88,8 @@ function moveShipForward() {
   // 下潜时可穿过/重叠任何舰船
   if (!ship.submerged) {
     for (const c of newCells) {
-      if (isCellOccupied(c.col, c.row, selectedShipIndex)) {
-        log(`无法前进：前方有舰船阻挡`);
+      if (isCellOccupied(c.col, c.row, selectedShipIndex, ship.length)) {
+        log(`无法前进：前方有障碍阻挡`);
         return false;
       }
     }
@@ -109,6 +114,7 @@ function moveShipForward() {
 }
 
 // ── 转向逻辑（以船尾(col,row)为圆心旋转） ──
+// delta: -1=左转90°, 1=右转90°
 function turnShip(delta) {
   if (gameOver) return false;
   if (selectedShipIndex < 0) return false;
@@ -134,8 +140,8 @@ function turnShip(delta) {
         log(`无法转向：转向后超出地图边界`);
         return false;
       }
-      if (isCellOccupied(cx, cy, selectedShipIndex)) {
-        log(`无法转向：目标格被其他舰船占据`);
+      if (isCellOccupied(cx, cy, selectedShipIndex, ship.length)) {
+        log(`无法转向：目标格被占据`);
         return false;
       }
     }
@@ -146,8 +152,8 @@ function turnShip(delta) {
         log(`无法转向：转向扫过区域超出地图边界`);
         return false;
       }
-      if (isCellOccupied(c.col, c.row, selectedShipIndex)) {
-        log(`无法转向：转向扫过区域被其他舰船阻挡`);
+      if (isCellOccupied(c.col, c.row, selectedShipIndex, ship.length)) {
+        log(`无法转向：转向扫过区域被阻挡`);
         return false;
       }
     }
@@ -198,6 +204,7 @@ function fireBroadside() {
         const tc = ox + sd.dx * r;
         const tr = oy + sd.dy * r;
         if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+        if (isTerrainBlockingRanged(tc, tr)) break; // 山地/雪山阻挡炮弹
         const hitIdx = findShipAt(tc, tr);
         if (hitIdx >= 0 && hitIdx !== selectedShipIndex) {
           // 隐蔽：未与敌方接触时无法被火炮命中
@@ -215,7 +222,7 @@ function fireBroadside() {
               hitsBroadside = (sd.dx * ironcladDv.dx + sd.dy * ironcladDv.dy === 0);
             }
             hits.push({ shipIdx: hitIdx, col: tc, row: tr, isFriendly: isFriendly, range: r, hitsBroadside: hitsBroadside });
-            if (!isFriendly && r === 1) {
+            if (r === 1) {
               const cellKey = `${ox},${oy}`;
               if (!contactedCells.has(cellKey)) {
                 contactedCells.add(cellKey);
@@ -549,6 +556,7 @@ function fireBowCannon() {
     var tc = bowCol + dv.dx * r;
     var tr = bowRow + dv.dy * r;
     if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+    if (isTerrainBlockingRanged(tc, tr)) break; // 山地/雪山阻挡
     var hitIdx = findShipAt(tc, tr);
     if (hitIdx >= 0 && hitIdx !== selectedShipIndex) {
       var hitShip = ships[hitIdx];
@@ -611,6 +619,7 @@ function fireGreekFire() {
     var tc = bowCol + dv.dx * r;
     var tr = bowRow + dv.dy * r;
     if (tc < 0 || tc >= GRID_SIZE || tr < 0 || tr >= GRID_SIZE) break;
+    if (isTerrainBlockingRanged(tc, tr)) break; // 山地/雪山阻挡
     var hitIdx = findShipAt(tc, tr);
     if (hitIdx >= 0 && hitIdx !== selectedShipIndex && ships[hitIdx].playerIndex !== ship.playerIndex) {
       ships[hitIdx].hp--;
@@ -718,6 +727,7 @@ function findAdjacentFriendly(shipIndex) {
   for (var j = 0; j < ships.length; j++) {
     if (j === shipIndex) continue;
     if (ships[j].playerIndex !== ship.playerIndex) continue;
+    if (ships[j].submerged) continue; // 下潜中不可补给
     var ec = getShipCells(ships[j]);
     var bDv = DIR_VECTORS[ships[j].direction];
     for (var si = 0; si < sc.length; si++) {

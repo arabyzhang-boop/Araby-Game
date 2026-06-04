@@ -22,7 +22,7 @@
 <link rel="apple-touch-icon" href="naval-chess-logo.png">
 <link rel="manifest" href="manifest.json">
 <title>Naval Chess：航海棋</title>
-<link rel="stylesheet" href="naval-chess-styles.css?v=19">
+<link rel="stylesheet" href="naval-chess-styles.css?v=30">
 </head>
 <body>
 
@@ -118,40 +118,7 @@
   <div class="library-card">
     <div class="library-title">名船库</div>
     <div class="selection-divider"></div>
-    <div class="library-grid" id="libraryGrid">
-      <div class="library-ship locked" id="libShip0">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip1">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip2">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip3">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip4">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip5">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip6">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-      <div class="library-ship locked" id="libShip7">
-        <div class="lib-ship-icon">?</div>
-        <div class="lib-ship-name">???</div>
-      </div>
-    </div>
+    <div class="library-grid" id="libraryGrid"></div>
     <div class="campaign-actions">
       <button class="selection-btn skip" id="btnLibraryBack">返回</button>
     </div>
@@ -299,7 +266,7 @@
 <!-- ═══ 胜利结算覆盖层 ═══ -->
 <div class="victory-overlay hidden" id="victoryOverlay" style="position:fixed;left:0;top:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;z-index:100;">
   <div class="victory-card">
-    <div class="victory-title">Victory</div>
+    <div class="victory-title" id="victoryTitle">VICTORY</div>
     <div class="victory-faction" id="victoryFaction">—</div>
     <div class="victory-divider"></div>
     <div class="victory-stats">
@@ -327,18 +294,18 @@
 </div>
 
 <!-- Scripts 按依赖顺序加载 -->
-<script src="naval-chess-config.js?v=19"></script>
-<script src="naval-chess-utils.js?v=19"></script>
-<script src="naval-chess-render.js?v=19"></script>
-<script src="naval-chess-ui.js?v=19"></script>
-<script src="naval-chess-combat.js?v=19"></script>
-<script src="naval-chess-actions.js?v=19"></script>
-<script src="naval-chess-fleet.js?v=19"></script>
-<script src="naval-chess-famous-ships.js?v=19"></script>
-<script src="naval-chess-ai.js?v=19"></script>
-<script src="naval-chess-campaign.js?v=19"></script>
-<script src="naval-chess-multiplayer.js?v=19"></script>
-<script src="naval-chess-main.js?v=19"></script>
+<script src="naval-chess-config.js?v=30"></script>
+<script src="naval-chess-utils.js?v=30"></script>
+<script src="naval-chess-render.js?v=30"></script>
+<script src="naval-chess-ui.js?v=30"></script>
+<script src="naval-chess-combat.js?v=30"></script>
+<script src="naval-chess-actions.js?v=30"></script>
+<script src="naval-chess-fleet.js?v=30"></script>
+<script src="naval-chess-famous-ships.js?v=30"></script>
+<script src="naval-chess-ai.js?v=30"></script>
+<script src="naval-chess-campaign.js?v=30"></script>
+<script src="naval-chess-multiplayer.js?v=30"></script>
+<script src="naval-chess-main.js?v=30"></script>
 
 <!-- ═══ 帮助窗口 ═══ -->
 <div class="help-overlay hidden" id="helpOverlay">

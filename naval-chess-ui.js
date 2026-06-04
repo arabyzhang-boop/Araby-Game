@@ -98,7 +98,7 @@ function updateActionButtons() {
 
   var hasAdjFriendly = selectedShipIndex >= 0 && findAdjacentFriendly(selectedShipIndex) >= 0;
   btnSupply.style.display = showSupply ? '' : 'none';
-  btnSupply.disabled = !(isCurrentPlayer && hasAdjFriendly && ship.actionsRemaining >= 1 && ship.supplyUsed < 3);
+  btnSupply.disabled = !(isCurrentPlayer && hasAdjFriendly && ship.actionsRemaining >= 1 && (ship.supplyUsed != null ? ship.supplyUsed : 0) < 3);
   btnAmmo.style.display = showSupply ? '' : 'none';
   btnAmmo.disabled = !(isCurrentPlayer && hasAdjFriendly && ship.actionsRemaining >= 1 && ship.broadsideCount < ship.maxBroadsideCount);
 
