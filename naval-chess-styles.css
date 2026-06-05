@@ -1119,7 +1119,7 @@
 /* ═══ 成就界面 ═══ */
 .achievement-overlay {
   position: fixed; left: 0; top: 0; width: 100%; height: 100%;
-  display: none; align-items: center; justify-content: center; z-index: 100;
+  display: none; align-items: center; justify-content: center; z-index: 110;
   background: rgba(10,5,2,0.85);
 }
 .achievement-card {

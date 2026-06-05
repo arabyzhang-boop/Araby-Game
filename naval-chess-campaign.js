@@ -37,6 +37,8 @@ function checkAchievements() {
 }
 
 function renderAchievementList() {
+  var listEl = document.getElementById('achList');
+  if (!listEl) return;
   var totalStars = getTotalCampaignStars();
   var html = '';
   for (var i = 0; i < ACHIEVEMENTS.length; i++) {
@@ -44,17 +46,18 @@ function renderAchievementList() {
     var progress = Math.min(100, Math.round(totalStars / ach.target * 100));
     var earned = totalStars >= ach.target;
     var ship = famousShipLibrary[ach.rewardShipIdx];
+    var flagHtml = (ship && typeof getFlagSVG === 'function') ? getFlagSVG(ship) : '';
     html += '<div class="ach-item' + (earned ? ' earned' : '') + '">';
     html += '<div class="ach-header">';
     html += '<span class="ach-name">' + ach.name + '</span>';
     html += '<span class="ach-status">' + (earned ? '✅ 已达成' : totalStars + '/' + ach.target + '⭐') + '</span>';
     html += '</div>';
     html += '<div class="ach-desc">' + ach.desc + '</div>';
-    html += '<div class="ach-reward">🎁 ' + ship.name + ' <span class="ach-flag">' + getFlagSVG(ship) + '</span></div>';
+    html += '<div class="ach-reward">🎁 ' + (ship ? ship.name : '?') + ' <span class="ach-flag">' + flagHtml + '</span></div>';
     html += '<div class="ach-bar-wrap"><div class="ach-bar-fill" style="width:' + progress + '%"></div></div>';
     html += '</div>';
   }
-  document.getElementById('achList').innerHTML = html;
+  listEl.innerHTML = html;
 }
 
 function saveCampaignProgress() {
@@ -424,10 +427,14 @@ document.getElementById('shipDetailOverlay').addEventListener('click', function(
 
 // ── 成就界面 ──
 document.getElementById('btnAchievements').addEventListener('click', function() {
-  renderAchievementList();
-  var overlay = document.getElementById('achievementOverlay');
-  overlay.classList.remove('hidden');
-  overlay.style.display = 'flex';
+  try {
+    renderAchievementList();
+    var overlay = document.getElementById('achievementOverlay');
+    overlay.classList.remove('hidden');
+    overlay.style.display = 'flex';
+  } catch (e) {
+    console.error('成就界面打开失败:', e);
+  }
 });
 
 document.getElementById('btnAchClose').addEventListener('click', function() {
