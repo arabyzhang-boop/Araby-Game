@@ -425,28 +425,27 @@ document.getElementById('shipDetailOverlay').addEventListener('click', function(
   if (e.target === this) hideShipDetail();
 });
 
-// ── 成就界面 ──
-document.getElementById('btnAchievements').addEventListener('click', function() {
-  try {
-    renderAchievementList();
-    var overlay = document.getElementById('achievementOverlay');
-    overlay.classList.remove('hidden');
-    overlay.style.display = 'flex';
-  } catch (e) {
-    console.error('成就界面打开失败:', e);
+// ── 成就界面（事件委托：避免 DOM 未就绪时元素不存在） ──
+document.addEventListener('click', function(e) {
+  // 打开成就界面
+  if (e.target.id === 'btnAchievements' || (e.target.closest && e.target.closest('#btnAchievements'))) {
+    try {
+      renderAchievementList();
+      var overlay = document.getElementById('achievementOverlay');
+      if (overlay) { overlay.classList.remove('hidden'); overlay.style.display = 'flex'; }
+    } catch (err) { console.error('成就界面打开失败:', err); }
+    return;
   }
-});
-
-document.getElementById('btnAchClose').addEventListener('click', function() {
-  var overlay = document.getElementById('achievementOverlay');
-  overlay.classList.add('hidden');
-  overlay.style.display = 'none';
-});
-
-document.getElementById('achievementOverlay').addEventListener('click', function(e) {
-  if (e.target === this) {
-    this.classList.add('hidden');
-    this.style.display = 'none';
+  // 关闭成就界面
+  if (e.target.id === 'btnAchClose' || (e.target.closest && e.target.closest('#btnAchClose'))) {
+    var achOverlay = document.getElementById('achievementOverlay');
+    if (achOverlay) { achOverlay.classList.add('hidden'); achOverlay.style.display = 'none'; }
+    return;
+  }
+  // 点击遮罩背景关闭
+  if (e.target.id === 'achievementOverlay') {
+    e.target.classList.add('hidden');
+    e.target.style.display = 'none';
   }
 });
 
