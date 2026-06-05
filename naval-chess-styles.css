@@ -1144,10 +1144,6 @@
   border: 1px solid rgba(139,90,40,0.25);
   border-radius: 5px; padding: 14px 16px;
 }
-.ach-item.earned {
-  border-color: rgba(39,174,96,0.4);
-  background: rgba(39,174,96,0.08);
-}
 .ach-header {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
 }
@@ -1158,7 +1154,6 @@
 .ach-status {
   font-size: 13px; color: var(--parchment-dark);
 }
-.ach-item.earned .ach-status { color: #27ae60; }
 .ach-desc {
   font-size: 12px; color: var(--parchment-dark); margin-bottom: 6px;
 }
@@ -1177,9 +1172,6 @@
   height: 100%; background: linear-gradient(90deg, #27ae60, #2ecc71);
   border-radius: 4px; transition: width 0.5s;
 }
-.ach-item.earned .ach-bar-fill {
-  background: linear-gradient(90deg, #27ae60, #2ecc71, #27ae60);
-}
 .ach-name.ach-gold {
   color: var(--gold-light); text-shadow: 0 0 8px rgba(201,169,78,0.5);
 }
@@ -1193,8 +1185,18 @@
 }
 .ach-claim-btn:hover { background: linear-gradient(180deg, #e6c96a 0%, #f4e4c1 100%); }
 .ach-claim-btn:active { background: #c9a94e; }
-.ach-claimed {
-  font-size: 16px; color: #27ae60; font-weight: bold; margin-left: auto;
+.ach-claimed-btn,
+.ach-claimed-btn:hover,
+.ach-claimed-btn:active {
+  background: linear-gradient(180deg, #c9a94e 0%, #b5943a 100%);
+  border-color: #8b5a2b; color: #5d4037; cursor: default; opacity: 0.9;
+}
+.ach-item.claimed {
+  border-color: rgba(201,169,78,0.5);
+  background: rgba(201,169,78,0.1);
+}
+.ach-item.claimed .ach-bar-fill {
+  background: linear-gradient(90deg, #c9a94e, #e6c96a, #c9a94e);
 }
 .ach-close-btn {
   align-self: flex-end; margin-top: 16px;

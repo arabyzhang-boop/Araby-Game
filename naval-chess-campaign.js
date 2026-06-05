@@ -69,18 +69,18 @@ function renderAchievementList() {
     var claimed = claimedAchievements.indexOf(ach.id) >= 0;
     var ship = famousShipLibrary[ach.rewardShipIdx];
     var flagHtml = (ship && typeof getFlagSVG === 'function') ? getFlagSVG(ship) : '';
-    html += '<div class="ach-item' + (earned ? ' earned' : '') + '">';
+    html += '<div class="ach-item' + (claimed ? ' claimed' : '') + (earned ? ' earned' : '') + '">';
     html += '<div class="ach-header">';
     html += '<span class="ach-name' + (earned ? ' ach-gold' : '') + '">' + ach.name + (earned ? ' 🏆' : '') + '</span>';
-    html += '<span class="ach-status">' + (earned ? '✅ 已达成' : totalStars + '/' + ach.target + '⭐') + '</span>';
+    html += '<span class="ach-status">' + totalStars + '/' + ach.target + '⭐' + (earned ? ' ✅️' : '') + '</span>';
     html += '</div>';
     html += '<div class="ach-desc">' + ach.desc + '</div>';
     html += '<div class="ach-reward">';
     html += '🎁 ' + (ship ? ship.name : '?') + ' <span class="ach-flag">' + flagHtml + '</span>';
-    if (earned && !claimed) {
+    if (claimed) {
+      html += ' <button class="ach-claim-btn ach-claimed-btn" disabled>已领取</button>';
+    } else if (earned) {
       html += ' <button class="ach-claim-btn" data-ach-id="' + ach.id + '">领取</button>';
-    } else if (claimed) {
-      html += ' <span class="ach-claimed">✓</span>';
     }
     html += '</div>';
     html += '<div class="ach-bar-wrap"><div class="ach-bar-fill" style="width:' + progress + '%"></div></div>';
