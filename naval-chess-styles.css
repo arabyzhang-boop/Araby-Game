@@ -1195,9 +1195,6 @@
   border-color: rgba(201,169,78,0.5);
   background: rgba(201,169,78,0.1);
 }
-.ach-item.claimed .ach-bar-fill {
-  background: linear-gradient(90deg, #c9a94e, #e6c96a, #c9a94e);
-}
 .ach-close-btn {
   align-self: flex-end; margin-top: 16px;
 }
