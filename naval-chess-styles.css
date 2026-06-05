@@ -1180,6 +1180,22 @@
 .ach-item.earned .ach-bar-fill {
   background: linear-gradient(90deg, #27ae60, #2ecc71, #27ae60);
 }
+.ach-name.ach-gold {
+  color: var(--gold-light); text-shadow: 0 0 8px rgba(201,169,78,0.5);
+}
+.ach-claim-btn {
+  font-family: 'IM Fell English', 'Georgia', serif;
+  font-size: 12px; padding: 2px 10px;
+  background: linear-gradient(180deg, #f4e4c1 0%, #c9a94e 100%);
+  border: 1px solid #8b5a2b; border-radius: 3px;
+  color: #3e2723; cursor: pointer;
+  margin-left: auto; white-space: nowrap;
+}
+.ach-claim-btn:hover { background: linear-gradient(180deg, #e6c96a 0%, #f4e4c1 100%); }
+.ach-claim-btn:active { background: #c9a94e; }
+.ach-claimed {
+  font-size: 16px; color: #27ae60; font-weight: bold; margin-left: auto;
+}
 .ach-close-btn {
   align-self: flex-end; margin-top: 16px;
 }

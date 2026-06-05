@@ -7,6 +7,7 @@
 var CAMPAIGN_SAVE_KEY = 'navalChessCampaign_v1';
 
 var campaignBestStars = {}; // { levelId: starCount }
+var claimedAchievements = []; // 已领取的成就ID
 
 // ── 成就系统 ──
 var ACHIEVEMENTS = [
@@ -27,13 +28,33 @@ function checkAchievements() {
   var totalStars = getTotalCampaignStars();
   for (var i = 0; i < ACHIEVEMENTS.length; i++) {
     var ach = ACHIEVEMENTS[i];
-    if (totalStars >= ach.target && campaignUnlockedShips.indexOf(ach.rewardShipIdx) < 0) {
-      campaignUnlockedShips.push(ach.rewardShipIdx);
-      saveCampaignProgress();
-      updateLibraryDisplay();
-      log('🏆 成就解锁：' + ach.name + ' — 获得名船 ' + famousShipLibrary[ach.rewardShipIdx].name + '！');
+    if (totalStars >= ach.target && !ach._notified) {
+      ach._notified = true;
+      log('🏆 成就解锁：' + ach.name + ' — 请前往成就页面领取奖励！');
     }
   }
+}
+
+function claimAchievement(achId) {
+  var ach = null, achIdx = -1;
+  for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+    if (ACHIEVEMENTS[i].id === achId) { ach = ACHIEVEMENTS[i]; achIdx = i; break; }
+  }
+  if (!ach) return;
+  var totalStars = getTotalCampaignStars();
+  if (totalStars < ach.target) return;
+  if (claimedAchievements.indexOf(achId) >= 0) return;
+  // 领取
+  claimedAchievements.push(achId);
+  if (campaignUnlockedShips.indexOf(ach.rewardShipIdx) < 0) {
+    campaignUnlockedShips.push(ach.rewardShipIdx);
+  }
+  saveCampaignProgress();
+  updateLibraryDisplay();
+  renderAchievementList();
+  log('🎉 ' + ach.name + ' 奖励已领取：' + famousShipLibrary[ach.rewardShipIdx].name + ' 加入名船库！');
+  // 弹出名船获取窗口
+  showShipDetail(ach.rewardShipIdx);
 }
 
 function renderAchievementList() {
@@ -45,15 +66,23 @@ function renderAchievementList() {
     var ach = ACHIEVEMENTS[i];
     var progress = Math.min(100, Math.round(totalStars / ach.target * 100));
     var earned = totalStars >= ach.target;
+    var claimed = claimedAchievements.indexOf(ach.id) >= 0;
     var ship = famousShipLibrary[ach.rewardShipIdx];
     var flagHtml = (ship && typeof getFlagSVG === 'function') ? getFlagSVG(ship) : '';
     html += '<div class="ach-item' + (earned ? ' earned' : '') + '">';
     html += '<div class="ach-header">';
-    html += '<span class="ach-name">' + ach.name + '</span>';
+    html += '<span class="ach-name' + (earned ? ' ach-gold' : '') + '">' + ach.name + (earned ? ' 🏆' : '') + '</span>';
     html += '<span class="ach-status">' + (earned ? '✅ 已达成' : totalStars + '/' + ach.target + '⭐') + '</span>';
     html += '</div>';
     html += '<div class="ach-desc">' + ach.desc + '</div>';
-    html += '<div class="ach-reward">🎁 ' + (ship ? ship.name : '?') + ' <span class="ach-flag">' + flagHtml + '</span></div>';
+    html += '<div class="ach-reward">';
+    html += '🎁 ' + (ship ? ship.name : '?') + ' <span class="ach-flag">' + flagHtml + '</span>';
+    if (earned && !claimed) {
+      html += ' <button class="ach-claim-btn" data-ach-id="' + ach.id + '">领取</button>';
+    } else if (claimed) {
+      html += ' <span class="ach-claimed">✓</span>';
+    }
+    html += '</div>';
     html += '<div class="ach-bar-wrap"><div class="ach-bar-fill" style="width:' + progress + '%"></div></div>';
     html += '</div>';
   }
@@ -63,10 +92,11 @@ function renderAchievementList() {
 function saveCampaignProgress() {
   try {
     var data = {
-      v: 2,
+      v: 3,
       unlockedShips: campaignUnlockedShips,
       completedLevels: campaignCompletedLevels,
-      bestStars: campaignBestStars
+      bestStars: campaignBestStars,
+      claimedAchievements: claimedAchievements
     };
     localStorage.setItem(CAMPAIGN_SAVE_KEY, JSON.stringify(data));
   } catch (e) {
@@ -83,6 +113,7 @@ function loadCampaignProgress() {
     campaignUnlockedShips = data.unlockedShips || [];
     campaignCompletedLevels = data.completedLevels || [];
     campaignBestStars = data.bestStars || {};
+    claimedAchievements = data.claimedAchievements || [];
   } catch (e) {
     // 数据损坏则丢弃，保留默认空数组
   }
@@ -446,6 +477,13 @@ document.addEventListener('click', function(e) {
   if (e.target.id === 'achievementOverlay') {
     e.target.classList.add('hidden');
     e.target.style.display = 'none';
+    return;
+  }
+  // 领取成就奖励
+  if (e.target.classList.contains('ach-claim-btn')) {
+    var achId = e.target.getAttribute('data-ach-id');
+    if (achId) claimAchievement(achId);
+    return;
   }
 });
 
