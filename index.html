@@ -93,7 +93,8 @@
       <button class="campaign-level locked" id="lvl8">关卡 8<span class="level-stars" id="lvl8Stars"></span></button>
     </div>
     <div class="campaign-actions">
-      <button class="selection-btn skip" id="btnCampaignBack">返回</button>
+      <button class="selection-btn refresh" id="btnCampaignBack">返回</button>
+      <button class="selection-btn refresh" id="btnAchievements">成就&#127942;</button>
       <button class="selection-btn refresh" id="btnOpenLibrary">名船库</button>
     </div>
   </div>
@@ -309,6 +310,16 @@
 <script src="naval-chess-main.js?v=31"></script>
 
 <!-- ═══ 帮助窗口 ═══ -->
+<!-- ═══ 成就界面 ═══ -->
+<div class="achievement-overlay hidden" id="achievementOverlay">
+  <div class="achievement-card">
+    <div class="achievement-title">成就 &#127942;</div>
+    <div class="selection-divider"></div>
+    <div class="ach-list" id="achList"></div>
+    <button class="selection-btn skip" id="btnAchClose" style="margin-top:16px;">返回</button>
+  </div>
+</div>
+
 <div class="help-overlay hidden" id="helpOverlay">
   <div class="help-card">
     <div class="help-title">Naval Chess 航海手册</div>

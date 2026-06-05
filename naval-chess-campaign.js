@@ -8,6 +8,55 @@ var CAMPAIGN_SAVE_KEY = 'navalChessCampaign_v1';
 
 var campaignBestStars = {}; // { levelId: starCount }
 
+// ── 成就系统 ──
+var ACHIEVEMENTS = [
+  { id: 'perfect1', name: '完美战役 I', desc: '关卡模式累计取得 9 ⭐', target: 9, rewardShipIdx: 3 },
+  { id: 'perfect2', name: '完美战役 II', desc: '关卡模式累计取得 18 ⭐', target: 18, rewardShipIdx: 7 },
+  { id: 'perfect3', name: '完美战役 III', desc: '关卡模式累计取得 27 ⭐', target: 27, rewardShipIdx: 10 }
+];
+
+function getTotalCampaignStars() {
+  var total = 0;
+  for (var key in campaignBestStars) {
+    if (campaignBestStars.hasOwnProperty(key)) total += campaignBestStars[key];
+  }
+  return total;
+}
+
+function checkAchievements() {
+  var totalStars = getTotalCampaignStars();
+  for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+    var ach = ACHIEVEMENTS[i];
+    if (totalStars >= ach.target && campaignUnlockedShips.indexOf(ach.rewardShipIdx) < 0) {
+      campaignUnlockedShips.push(ach.rewardShipIdx);
+      saveCampaignProgress();
+      updateLibraryDisplay();
+      log('🏆 成就解锁：' + ach.name + ' — 获得名船 ' + famousShipLibrary[ach.rewardShipIdx].name + '！');
+    }
+  }
+}
+
+function renderAchievementList() {
+  var totalStars = getTotalCampaignStars();
+  var html = '';
+  for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+    var ach = ACHIEVEMENTS[i];
+    var progress = Math.min(100, Math.round(totalStars / ach.target * 100));
+    var earned = totalStars >= ach.target;
+    var ship = famousShipLibrary[ach.rewardShipIdx];
+    html += '<div class="ach-item' + (earned ? ' earned' : '') + '">';
+    html += '<div class="ach-header">';
+    html += '<span class="ach-name">' + ach.name + '</span>';
+    html += '<span class="ach-status">' + (earned ? '✅ 已达成' : totalStars + '/' + ach.target + '⭐') + '</span>';
+    html += '</div>';
+    html += '<div class="ach-desc">' + ach.desc + '</div>';
+    html += '<div class="ach-reward">🎁 ' + ship.name + ' <span class="ach-flag">' + getFlagSVG(ship) + '</span></div>';
+    html += '<div class="ach-bar-wrap"><div class="ach-bar-fill" style="width:' + progress + '%"></div></div>';
+    html += '</div>';
+  }
+  document.getElementById('achList').innerHTML = html;
+}
+
 function saveCampaignProgress() {
   try {
     var data = {
@@ -281,6 +330,7 @@ function completeCurrentLevel(starCount) {
   }
   saveCampaignProgress();
   updateCampaignLevelButtons();
+  checkAchievements();
 }
 
 // ── 显示名船解锁提示（结算窗口之后调用） ──
@@ -372,6 +422,27 @@ document.getElementById('shipDetailOverlay').addEventListener('click', function(
   if (e.target === this) hideShipDetail();
 });
 
+// ── 成就界面 ──
+document.getElementById('btnAchievements').addEventListener('click', function() {
+  renderAchievementList();
+  var overlay = document.getElementById('achievementOverlay');
+  overlay.classList.remove('hidden');
+  overlay.style.display = 'flex';
+});
+
+document.getElementById('btnAchClose').addEventListener('click', function() {
+  var overlay = document.getElementById('achievementOverlay');
+  overlay.classList.add('hidden');
+  overlay.style.display = 'none';
+});
+
+document.getElementById('achievementOverlay').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.classList.add('hidden');
+    this.style.display = 'none';
+  }
+});
+
 // ── 绑定关卡按钮 ──
 for (var li = 0; li < campaignLevels.length; li++) {
   var lvlBtn = document.getElementById('lvl' + (li + 1));
@@ -386,3 +457,4 @@ for (var li = 0; li < campaignLevels.length; li++) {
 loadCampaignProgress();
 updateCampaignLevelButtons();
 updateLibraryDisplay();
+checkAchievements();
