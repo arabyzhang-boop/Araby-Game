@@ -463,8 +463,9 @@
     .ship-pick-name { font-size: 13px; }
     .ship-pick-price { font-size: 12px; }
     .campaign-card, .library-card { padding: 16px 12px; max-width: 98vw; }
-    .campaign-grid, .library-grid { gap: 5px; }
-    .campaign-level { font-size: 12px; padding: 12px 6px; min-width: 80px; min-height: 66px; }
+    .campaign-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .library-grid { gap: 5px; }
+    .campaign-level { font-size: 13px; padding: 14px 8px; min-height: 72px; }
     .lib-ship-btn { padding: 10px 6px; }
     .lib-ship-name { font-size: 11px; letter-spacing: 0.5px; }
     .lib-ship-flag svg { width: 22px; height: 18px; }
@@ -1199,6 +1200,21 @@
 }
 .ach-close-btn {
   align-self: flex-end; margin-top: 16px;
+  background: linear-gradient(180deg, #f4e4c1 0%, #d4b896 100%);
+  color: #3e2723; border: 2px solid #c9a94e;
+  font-weight: bold; font-size: 15px;
+  padding: 10px 28px; letter-spacing: 2px;
+  box-shadow: 0 2px 0 #8b6914, 0 3px 8px rgba(0,0,0,0.4);
+}
+.ach-close-btn:hover {
+  background: linear-gradient(180deg, #fff 0%, #f4e4c1 100%);
+  border-color: #e6c96a; color: #1a0e00;
+  box-shadow: 0 2px 0 #a07810, 0 4px 12px rgba(255,215,0,0.4);
+  transform: translateY(-1px);
+}
+.ach-close-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #8b6914;
 }
 
 /* ═══ 名船库界面 ═══ */
