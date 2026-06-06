@@ -505,8 +505,8 @@ function mpGenerateFleetPositions(redPicks, bluePicks) {
     placeFleet(redFleet, 0, 5, 10, [DIR.N, DIR.E, DIR.S], 6, 15);
     placeFleet(blueFleet, 1, 9, 14, [DIR.N, DIR.W, DIR.S], 6, 15);
   } else {
-    placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
-    placeFleet(blueFleet, 1, 16, 19, [DIR.N, DIR.W, DIR.S]);
+    placeFleet(redFleet, 0, 0, 4, [DIR.N, DIR.E, DIR.S]);
+    placeFleet(blueFleet, 1, 15, 19, [DIR.N, DIR.W, DIR.S]);
   }
   // 用 JSON 深拷贝确保所有属性完整传递
   var fleetData = JSON.parse(JSON.stringify(ships));

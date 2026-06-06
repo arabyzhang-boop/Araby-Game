@@ -62,11 +62,6 @@ function isTerrainBlocking(col, row, optShipLength) {
   if (t.type === TERRAIN.MOUNTAIN || t.type === TERRAIN.SNOW_MOUNTAIN ||
       t.type === TERRAIN.LOW_ISLAND || t.type === TERRAIN.FLAG ||
       t.type === TERRAIN.SUPPLY || t.type === TERRAIN.POWDER_KEG) return true;
-  // 尺寸依赖地形（仅当传入舰船长度时才判断）
-  if (optShipLength != null) {
-    if (t.type === TERRAIN.SHOAL && optShipLength >= 2) return true;
-    if (t.type === TERRAIN.MEDIUM_SHOAL && optShipLength >= 3) return true;
-  }
   return false;
 }
 
@@ -75,6 +70,28 @@ function isTerrainBlockingRanged(col, row) {
   var t = getTerrainAt(col, row);
   if (!t) return false;
   return t.type === TERRAIN.MOUNTAIN || t.type === TERRAIN.SNOW_MOUNTAIN;
+}
+
+/** 检查舰船在回合开始时是否处于搁浅状态 */
+function isShipGrounded(ship) {
+  var cells = getShipCells(ship);
+  for (var i = 0; i < cells.length; i++) {
+    var t = getTerrainAt(cells[i].col, cells[i].row);
+    if (!t) continue;
+    if (t.type === TERRAIN.SHOAL && ship.length >= 2) return true;
+    if (t.type === TERRAIN.MEDIUM_SHOAL && ship.length >= 3) return true;
+  }
+  return false;
+}
+
+/** 回合开始时更新当前玩家所有舰船的搁浅状态 */
+function updateGroundedShips() {
+  for (var i = 0; i < ships.length; i++) {
+    var s = ships[i];
+    if (s.playerIndex === currentPlayerIndex) {
+      s.grounded = isShipGrounded(s);
+    }
+  }
 }
 
 /** 该格是否处于云雾区内 */
@@ -229,7 +246,7 @@ function createShip(props) {
     submerged: false, submergedTurns: 0, submergeUsed: false,
     bowCannonUsed: false, greekFireUsed: false,
     devourTarget: -1, devourProgress: 0,
-    sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0
+    sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0, grounded: false
   };
   // 应用名船被动技能
   if (sd) {

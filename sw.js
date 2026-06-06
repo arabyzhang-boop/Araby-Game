@@ -3,7 +3,7 @@
 //   HTML/JS/CSS  → 网络优先（保证实时更新）
 //   MP3/PNG 等媒体 → 缓存优先，后台更新（大文件秒加载）
 
-const CACHE_NAME = 'naval-chess-v6';
+const CACHE_NAME = 'naval-chess-v8';
 const PRECACHE_FILES = [
   './',
   'naval-chess.html',

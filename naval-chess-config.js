@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════
 
 // 更新版本时请修改此版本号（格式: YYMMDD-N）
-var APP_VERSION = '250605-12';
+var APP_VERSION = '250606-03';
 
 // ── 菜单控制 ──
 var gameMode = 'pvp'; // 'pvp' | 'ai'
@@ -99,8 +99,8 @@ var TERRAIN = {
   LOW_ISLAND: 'lowIsland',       // 🏝️ 低海拔岛屿：阻挡移动但不阻挡远程
   FLAG: 'flag',                  // 🚩 目标点：占据即胜利
   SUPPLY: 'supply',              // ❤️ 补给点：占据恢复1HP
-  SHOAL: 'shoal',                // 浅滩：阻挡中/大型舰船（长度≥2）
-  MEDIUM_SHOAL: 'mediumShoal',   // 中浅滩：仅阻挡大型舰船（长度≥3）
+  SHOAL: 'shoal',                // 浅滩：回合开始时中/大型舰船搁浅，无法前进和转向
+  MEDIUM_SHOAL: 'mediumShoal',   // 中浅滩：回合开始时大型舰船搁浅
   POWDER_KEG: 'powderKeg'        // 火药桶：占据补充一次舷炮
 };
 var terrain = []; // { col, row, type }

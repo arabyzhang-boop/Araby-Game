@@ -41,6 +41,9 @@ function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinO
         const cy = row + dv.dy * i;
         if (cx < 0 || cx >= GRID_SIZE || cy < 0 || cy >= GRID_SIZE) { valid = false; break; }
         if (isCellInFleet(cx, cy) || isCellAdjacentToFleet(cx, cy, playerIndex) || isTerrainBlocking(cx, cy)) { valid = false; break; }
+        // 避免部署在会导致搁浅的浅滩上
+        var tCheck = getTerrainAt(cx, cy);
+        if (tCheck && ((tCheck.type === TERRAIN.SHOAL && def.length >= 2) || (tCheck.type === TERRAIN.MEDIUM_SHOAL && def.length >= 3))) { valid = false; break; }
         cells.push({ col: cx, row: cy });
       }
       if (valid) {
@@ -72,9 +75,9 @@ function initTestShips(redPicks, bluePicks) {
     placeFleet(blueFleet, 1, 9, 14, [DIR.N, DIR.W, DIR.S], 6, 15);
     log('极速模式：舰队部署在中央战区。');
   } else {
-    // 经典模式：红方 A-D(0-3)、蓝方 Q-T(16-19)
-    placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
-    placeFleet(blueFleet, 1, 16, 19, [DIR.N, DIR.W, DIR.S]);
+    // 经典模式：红方 A-E(0-4)、蓝方 P-T(15-19)
+    placeFleet(redFleet, 0, 0, 4, [DIR.N, DIR.E, DIR.S]);
+    placeFleet(blueFleet, 1, 15, 19, [DIR.N, DIR.W, DIR.S]);
     log('舰队就位。红方 ' + redFleet.length + ' 艘，蓝方 ' + blueFleet.length + ' 艘。');
   }
 
@@ -82,6 +85,7 @@ function initTestShips(redPicks, bluePicks) {
   currentPlayerIndex = 0;
   currentTurn = 1;
   recordInitialFleetStats();
+  updateGroundedShips();
   updatePlayerDisplay();
   updateInfoPanel();
   updateActionButtons();

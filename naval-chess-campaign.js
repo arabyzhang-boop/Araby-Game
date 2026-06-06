@@ -189,27 +189,157 @@ var campaignLevels = [
     ],
     terrain: [].concat(
       // ═══ 雪山大陆（左上，冰盖向东收缩） ═══
-      _tr(0,0,19, TERRAIN.SNOW_MOUNTAIN), _tr(1,0,19, TERRAIN.SNOW_MOUNTAIN),
+      _tr(0,0,17, TERRAIN.SNOW_MOUNTAIN), _tr(1,0,16, TERRAIN.SNOW_MOUNTAIN),
       _tr(2,0,14, TERRAIN.SNOW_MOUNTAIN),
       _tr(3,0,12, TERRAIN.SNOW_MOUNTAIN),
       _tr(4,0,10, TERRAIN.SNOW_MOUNTAIN),
       _tr(5,0,8, TERRAIN.SNOW_MOUNTAIN),
-      _tr(6,0,7, TERRAIN.SNOW_MOUNTAIN), _tr(7,2,7, TERRAIN.SNOW_MOUNTAIN),
+      _tr(6,0,8, TERRAIN.SNOW_MOUNTAIN), _tr(7,2,7, TERRAIN.SNOW_MOUNTAIN),
       _tr(8,4,7, TERRAIN.SNOW_MOUNTAIN),
       _tr(9,5,7, TERRAIN.SNOW_MOUNTAIN),
       // ═══ 山地大陆（右下，留出右侧开阔水域） ═══
       _tr(10,11,12, TERRAIN.MOUNTAIN),
       _tr(11,11,13, TERRAIN.MOUNTAIN),
-      _tr(12,8,16, TERRAIN.MOUNTAIN),
+      _tr(12,11,16, TERRAIN.MOUNTAIN),
       _tr(13,7,19, TERRAIN.MOUNTAIN),
       _tr(14,5,19, TERRAIN.MOUNTAIN),
       _tr(15,4,19, TERRAIN.MOUNTAIN),
       _tr(16,3,19, TERRAIN.MOUNTAIN),
       _tr(17,3,19, TERRAIN.MOUNTAIN),
-      _tr(18,1,19, TERRAIN.MOUNTAIN),
-      _tr(19,0,19, TERRAIN.MOUNTAIN)
+      _tr(18,2,19, TERRAIN.MOUNTAIN),
+      _tr(19,1,19, TERRAIN.MOUNTAIN)
     ),
     unlockShip: 8 // 通关解锁 famousShipLibrary[8] = 黄泉号
+  },
+  { // 关卡 4 — 浅滩群岛
+    id: 4,
+    aiShips: ['黑珍珠号'],
+    deployZone: { colMin: 0, colMax: 4, dirs: [DIR.N, DIR.E, DIR.S] },
+    enemyFleet: [
+      // 黑珍珠号：船头P8朝西，长度2，锚点(16,7)
+      { name: '黑珍珠号', length: 2, col: 16, row: 7, direction: DIR.W,
+        skill: famousShipLibrary[1].skill, skillData: famousShipLibrary[1].skillData,
+        flagColor: famousShipLibrary[1].flagColor, flagShape: famousShipLibrary[1].flagShape,
+        flagIcon: famousShipLibrary[1].flagIcon, flagPattern: famousShipLibrary[1].flagPattern },
+      // 普通大船：船头K12朝南，长度3，锚点(10,9)，已搁浅于中浅滩
+      { name: '大型舰艇', length: 3, col: 10, row: 9, direction: DIR.S,
+        skill: null, skillData: null },
+      // 普通中船：船头O13朝西，长度2，锚点(15,12)
+      { name: '中型舰艇', length: 2, col: 15, row: 12, direction: DIR.W,
+        skill: null, skillData: null },
+      // 普通中船：船头N18朝西，长度2，锚点(14,17)
+      { name: '中型舰艇', length: 2, col: 14, row: 17, direction: DIR.W,
+        skill: null, skillData: null },
+      // 普通小船：船头P14朝西，长度1，锚点(15,13)
+      { name: '小型舰艇', length: 1, col: 15, row: 13, direction: DIR.W,
+        skill: null, skillData: null },
+      // 普通小船：船头P7朝西，长度1，锚点(15,6)
+      { name: '小型舰艇', length: 1, col: 15, row: 6, direction: DIR.W,
+        skill: null, skillData: null },
+      // 普通中船：船头N3朝西，长度2，锚点(14,2)
+      { name: '中型舰艇', length: 2, col: 14, row: 2, direction: DIR.W,
+        skill: null, skillData: null }
+    ],
+    terrain: [
+      { col: 8, row: 3, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 3, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 3, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 11, row: 3, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 4, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 4, type: TERRAIN.SHOAL },
+      { col: 9, row: 4, type: TERRAIN.SHOAL },
+      { col: 10, row: 4, type: TERRAIN.SHOAL },
+      { col: 11, row: 4, type: TERRAIN.SHOAL },
+      { col: 12, row: 4, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 6, row: 5, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 5, type: TERRAIN.SHOAL },
+      { col: 8, row: 5, type: TERRAIN.SHOAL },
+      { col: 9, row: 5, type: TERRAIN.LOW_ISLAND },
+      { col: 10, row: 5, type: TERRAIN.LOW_ISLAND },
+      { col: 11, row: 5, type: TERRAIN.SHOAL },
+      { col: 12, row: 5, type: TERRAIN.SHOAL },
+      { col: 13, row: 5, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 6, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 6, row: 6, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 6, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 6, type: TERRAIN.SHOAL },
+      { col: 9, row: 6, type: TERRAIN.SHOAL },
+      { col: 10, row: 6, type: TERRAIN.SHOAL },
+      { col: 11, row: 6, type: TERRAIN.SHOAL },
+      { col: 12, row: 6, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 13, row: 6, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 7, type: TERRAIN.SHOAL },
+      { col: 1, row: 7, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 7, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 7, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 7, type: TERRAIN.SHOAL },
+      { col: 10, row: 7, type: TERRAIN.SHOAL },
+      { col: 11, row: 7, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 12, row: 7, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 8, type: TERRAIN.SHOAL },
+      { col: 1, row: 8, type: TERRAIN.SHOAL },
+      { col: 2, row: 8, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 8, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 8, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 8, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 11, row: 8, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 9, type: TERRAIN.LOW_ISLAND },
+      { col: 1, row: 9, type: TERRAIN.SHOAL },
+      { col: 2, row: 9, type: TERRAIN.SHOAL },
+      { col: 3, row: 9, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 9, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 9, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 10, type: TERRAIN.LOW_ISLAND },
+      { col: 1, row: 10, type: TERRAIN.SHOAL },
+      { col: 2, row: 10, type: TERRAIN.SHOAL },
+      { col: 3, row: 10, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 10, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 10, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 11, type: TERRAIN.SHOAL },
+      { col: 1, row: 11, type: TERRAIN.SHOAL },
+      { col: 2, row: 11, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 11, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 11, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 11, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 11, row: 11, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 12, type: TERRAIN.SHOAL },
+      { col: 1, row: 12, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 12, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 12, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 12, type: TERRAIN.SHOAL },
+      { col: 10, row: 12, type: TERRAIN.SHOAL },
+      { col: 11, row: 12, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 12, row: 12, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 0, row: 13, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 6, row: 13, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 13, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 13, type: TERRAIN.SHOAL },
+      { col: 9, row: 13, type: TERRAIN.SHOAL },
+      { col: 10, row: 13, type: TERRAIN.SHOAL },
+      { col: 11, row: 13, type: TERRAIN.SHOAL },
+      { col: 12, row: 13, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 13, row: 13, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 6, row: 14, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 14, type: TERRAIN.SHOAL },
+      { col: 8, row: 14, type: TERRAIN.SHOAL },
+      { col: 9, row: 14, type: TERRAIN.LOW_ISLAND },
+      { col: 10, row: 14, type: TERRAIN.LOW_ISLAND },
+      { col: 11, row: 14, type: TERRAIN.SHOAL },
+      { col: 12, row: 14, type: TERRAIN.SHOAL },
+      { col: 13, row: 14, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 7, row: 15, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 15, type: TERRAIN.SHOAL },
+      { col: 9, row: 15, type: TERRAIN.SHOAL },
+      { col: 10, row: 15, type: TERRAIN.SHOAL },
+      { col: 11, row: 15, type: TERRAIN.SHOAL },
+      { col: 12, row: 15, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 8, row: 16, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 9, row: 16, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 10, row: 16, type: TERRAIN.MEDIUM_SHOAL },
+      { col: 11, row: 16, type: TERRAIN.MEDIUM_SHOAL }
+  ],
+
+    unlockShip: 1 // 通关解锁 famousShipLibrary[1] = 黑珍珠号
   }
 ];
 
@@ -329,7 +459,7 @@ function initCampaignGame(redPicks) {
   } else if (campaignLevelId >= 2) {
     placeFleet(redFleet, 0, 5, 10, [DIR.N, DIR.E, DIR.S], 6, 15);
   } else {
-    placeFleet(redFleet, 0, 0, 3, [DIR.N, DIR.E, DIR.S]);
+    placeFleet(redFleet, 0, 0, 4, [DIR.N, DIR.E, DIR.S]);
   }
 
   log('关卡 ' + campaignLevelId + '：迎战 ' + level.enemyFleet[0].name + '！');
@@ -339,6 +469,7 @@ function initCampaignGame(redPicks) {
   currentPlayerIndex = 0;
   currentTurn = 1;
   recordInitialFleetStats();
+  updateGroundedShips();
   updatePlayerDisplay();
   updateInfoPanel();
   updateActionButtons();

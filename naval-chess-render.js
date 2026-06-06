@@ -343,58 +343,41 @@ function drawTerrain() {
   }
 }
 
-// ── 浅滩（沙底 + 3颗暗礁石，阻挡中/大型船） ──
+// ── 浅滩（3个小点，回合开始时中/大型船搁浅） ──
 function drawShoal(col, row) {
   var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
   ctx.save();
-  // 沙色底色
-  ctx.fillStyle = '#cfbe98';
-  ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
-  // 水纹
-  ctx.strokeStyle = 'rgba(139, 115, 85, 0.5)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(x + 5, y + s * 0.45);
-  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.3, x + s - 5, y + s * 0.45);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x + 4, y + s * 0.7);
-  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.55, x + s - 4, y + s * 0.7);
-  ctx.stroke();
-  // 3颗礁石（三角排列）
   var dots = [
-    { dx: 0.35, dy: 0.38, r: 2.2 },
-    { dx: 0.65, dy: 0.38, r: 2.2 },
-    { dx: 0.50, dy: 0.65, r: 2.5 }
+    { dx: 0.30, dy: 0.35 },
+    { dx: 0.70, dy: 0.35 },
+    { dx: 0.50, dy: 0.70 }
   ];
-  ctx.fillStyle = '#6b5640';
+  ctx.fillStyle = '#7a6248';
   for (var di = 0; di < dots.length; di++) {
     ctx.beginPath();
-    ctx.arc(x + s * dots[di].dx, y + s * dots[di].dy, dots[di].r, 0, Math.PI * 2);
+    ctx.arc(x + s * dots[di].dx, y + s * dots[di].dy, 1.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-// ── 中浅滩（更浅的沙底 + 1颗小礁石，仅阻挡大型船） ──
+// ── 中浅滩（5个小点，回合开始时大型船搁浅） ──
 function drawMediumShoal(col, row) {
   var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
   ctx.save();
-  // 更浅的沙色
-  ctx.fillStyle = '#ddd0b8';
-  ctx.fillRect(x + 2, y + 2, s - 4, s - 4);
-  // 单条水纹
-  ctx.strokeStyle = 'rgba(139, 115, 85, 0.35)';
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(x + 5, y + s * 0.5);
-  ctx.quadraticCurveTo(x + s * 0.5, y + s * 0.38, x + s - 5, y + s * 0.5);
-  ctx.stroke();
-  // 1颗小礁石
+  var dots = [
+    { dx: 0.25, dy: 0.30 },
+    { dx: 0.75, dy: 0.30 },
+    { dx: 0.50, dy: 0.50 },
+    { dx: 0.25, dy: 0.70 },
+    { dx: 0.75, dy: 0.70 }
+  ];
   ctx.fillStyle = '#8b7355';
-  ctx.beginPath();
-  ctx.arc(x + s * 0.5, y + s * 0.62, 2, 0, Math.PI * 2);
-  ctx.fill();
+  for (var di = 0; di < dots.length; di++) {
+    ctx.beginPath();
+    ctx.arc(x + s * dots[di].dx, y + s * dots[di].dy, 1.0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
 }
 

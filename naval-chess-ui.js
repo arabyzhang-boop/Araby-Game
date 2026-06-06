@@ -21,7 +21,7 @@ function updateInfoPanel() {
       elSkillInfoItem.style.display = 'none';
       elShipSkill.innerHTML = '—';
     }
-    elActionsLeft.textContent = ship.submerged ? `下潜中(${ship.submergedTurns}回合)` : (ship.boardingTargets.length > 0 ? '接舷战中' : ship.actionsRemaining);
+    elActionsLeft.textContent = ship.submerged ? `下潜中(${ship.submergedTurns}回合)` : (ship.boardingTargets.length > 0 ? '接舷战中' : (ship.grounded ? '搁浅' : ship.actionsRemaining));
     elShipHP.textContent    = `${ship.hp} / ${ship.maxHp}${ship.boardingTargets.length > 0 ? ' ⚔' : ''}`;
     // 面板显示选中舰船所属势力
     var isAiShip = (gameMode === 'ai' || inCampaign) && ship.playerIndex === 1;
@@ -60,11 +60,12 @@ function updateActionButtons() {
   const isCurrentPlayer = ship && ship.playerIndex === currentPlayerIndex && (!mpGameStarted || currentPlayerIndex === mpPlayerIndex);
   const isBoarding = ship && ship.boardingTargets.length > 0;
 
-  var moveBlocked = ship && ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2;
+  var grounded = ship && ship.grounded;
+  var moveBlocked = ship && ((ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2) || grounded);
   btnMove.disabled      = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= 1 && !moveBlocked);
   var tc = ship ? getTurnCost(ship) : 1;
-  btnTurnLeft.disabled  = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= tc);
-  btnTurnRight.disabled = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= tc);
+  btnTurnLeft.disabled  = !(isCurrentPlayer && !isBoarding && !grounded && ship.actionsRemaining >= tc);
+  btnTurnRight.disabled = !(isCurrentPlayer && !isBoarding && !grounded && ship.actionsRemaining >= tc);
   btnBroadside.disabled = !(isCurrentPlayer && !isBoarding && ship.actionsRemaining >= 1 && ship.broadsideCount < ship.maxBroadsideCount);
   var isSubmerged = ship && ship.submerged;
   btnRam.disabled       = !(isCurrentPlayer && !isBoarding && !isSubmerged && ship.actionsRemaining >= 1 && findRammingTarget(selectedShipIndex) !== null);

@@ -350,10 +350,19 @@ function switchToNextPlayer() {
   processBoardingDamage();
   if (gameOver) return;
 
+  // 检查回合结束方是否有舰船搁浅
+  for (var gi = 0; gi < ships.length; gi++) {
+    var gs = ships[gi];
+    if (gs.playerIndex === currentPlayerIndex && isShipGrounded(gs)) {
+      log('⚠️ ' + shipName(gi) + ' 处于浅滩，下回合将搁浅！');
+    }
+  }
+
   var playerCount = 2;
   currentPlayerIndex = (currentPlayerIndex + 1) % playerCount;
   if (currentPlayerIndex === 0) currentTurn++;
 
+  updateGroundedShips();
   ships.forEach(function(s) {
     if (s.playerIndex === currentPlayerIndex) {
       s.actionsRemaining = s.maxActions;

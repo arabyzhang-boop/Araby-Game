@@ -70,6 +70,7 @@ function moveShipForward() {
   if (ship.playerIndex !== currentPlayerIndex) return false;
   if (ship.boardingTargets.length > 0) { log('无法前进：正处于接舷战中'); return false; }
   if (ship.actionsRemaining < 1) return false;
+  if (ship.grounded) { log('无法前进：搁浅在浅滩上'); return false; }
 
   const dv = DIR_VECTORS[ship.direction];
   // 铁甲：每回合最多前进2次
@@ -125,6 +126,7 @@ function turnShip(delta) {
   const ship = ships[selectedShipIndex];
   if (ship.playerIndex !== currentPlayerIndex) return false;
   if (ship.boardingTargets.length > 0) { log('无法转向：正处于接舷战中'); return false; }
+  if (ship.grounded) { log('无法转向：搁浅在浅滩上'); return false; }
   var turnCost = getTurnCost(ship);
   if (ship.actionsRemaining < turnCost) {
     log(`无法转向：行动力不足（需 ${turnCost}，剩余 ${ship.actionsRemaining}）`);
@@ -356,9 +358,9 @@ function initiateRamming() {
     defDmg = dmg;
     log(`冲锋撞击敌方船舷！自身受到 ${atkDmg} 点反冲伤害，敌方受到 ${defDmg} 点伤害`);
   } else {
-    atkDmg = Math.min(dmg, ship.length);
+    atkDmg = dmg;
     defDmg = Math.min(dmg, ship.length);
-    log(`冲锋船头对撞！双方各受到 ${atkDmg} 点伤害${dmg > ship.length ? '（已达撞击船体积上限）' : ''}`);
+    log(`冲锋船头/船尾对撞！己方受到 ${atkDmg} 点伤害，敌方受到 ${defDmg} 点伤害${dmg > ship.length ? '（敌方伤害已达撞击船体积上限）' : ''}`);
   }
 
   // 铁甲：仅船舷受撞击时伤害-1（可减至0）

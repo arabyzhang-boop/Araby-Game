@@ -763,7 +763,7 @@ function getLegalActions(playerIdx) {
 
     // 前进（铁甲限制：每回合最多2次）
     var ironBlocked = ship.skillData && ship.skillData.ironArmor && ship.ironArmorMoves >= 2;
-    if (!ironBlocked) {
+    if (!ironBlocked && !ship.grounded) {
       var dv = DIR_VECTORS[ship.direction];
       var step = ship.submerged ? 2 : 1;
       var nc = ship.col + dv.dx * step;
@@ -777,8 +777,8 @@ function getLegalActions(playerIdx) {
       if (canMove) actions.push({ type: 'move', shipIdx: sid });
     }
 
-    // 转向
-    if (ship.actionsRemaining >= ship.length) {
+    // 转向（搁浅时不可转向）
+    if (ship.actionsRemaining >= ship.length && !ship.grounded) {
       for (var d = -1; d <= 1; d += 2) {
         var nd = (ship.direction + d + 4) % 4;
         var ndv = DIR_VECTORS[nd];
@@ -1006,6 +1006,21 @@ function _simCountBroadside(ship) {
   return { enemy: enemyHits, self: selfDmg };
 }
 
+/** 检查舰船在给定位置是否会搁浅（用于AI决策） */
+function _wouldBeGrounded(ship, col, row) {
+  var cells = _simCellsAt(ship, col, row);
+  for (var i = 0; i < cells.length; i++) {
+    var t = null;
+    for (var ti = 0; ti < terrain.length; ti++) {
+      if (terrain[ti].col === cells[i].col && terrain[ti].row === cells[i].row) { t = terrain[ti]; break; }
+    }
+    if (!t) continue;
+    if (t.type === 'shoal' && ship.length >= 2) return true;
+    if (t.type === 'mediumShoal' && ship.length >= 3) return true;
+  }
+  return false;
+}
+
 function greedyScore(action, shipIdx) {
   var ship = ships[shipIdx];
   var score = 1;
@@ -1043,6 +1058,7 @@ function greedyScore(action, shipIdx) {
     }
     var distChange = oldDist - newDist; // 正=接近，负=远离
     score = Math.max(6, 8 + (distChange > 0 ? distChange * 4 : distChange * 1));
+    if (_wouldBeGrounded(ship, nc, nr)) score -= 15;
   } else if (action.type === 'turn') {
     score = 3;
   } else if (action.type === 'broadside') {
@@ -1079,6 +1095,7 @@ function evaluateState(playerIdx) {
     var s = ships[i];
     if (s.playerIndex === playerIdx) {
       aiHp += s.hp; aiMaxHp += s.maxHp; aiShips++;
+      if (s.grounded) aiSkills -= 0.5; // 搁浅惩罚
       if (s.broadsideCount < s.maxBroadsideCount) aiBroadside++;
       if (s.skillData && s.boardingTargets.length === 0) {
         var sd = s.skillData;
@@ -1090,6 +1107,7 @@ function evaluateState(playerIdx) {
       }
     } else {
       plHp += s.hp; plMaxHp += s.maxHp; plShips++;
+      if (s.grounded) plHp -= 1; // 搁浅视为等效HP损失
     }
   }
 
@@ -1265,6 +1283,7 @@ function timidScore(action, shipIdx) {
     // 距敌1格以内才略扣（舷炮最佳距离2-4格，1格是撞击/接舷预备位）
     if (newDist <= 1 && oldDist > 1) moveScore -= 3;
     // 已经非常接近时不鼓励继续前冲，转交攻击行动评分接管
+    if (_wouldBeGrounded(ship, nc, nr)) moveScore -= 20;
     return Math.max(10, moveScore);
   }
 
@@ -1303,8 +1322,8 @@ function timidScore(action, shipIdx) {
     var dv3 = DIR_VECTORS[ship.direction];
     var eDv = DIR_VECTORS[enemy.direction];
     var dot = (-dv3.dx) * eDv.dx + (-dv3.dy) * eDv.dy;
-    var atkDmg = dot === 0 ? 1 : dmg;  // 侧撞=1，对撞=dmg
-    var defDmg = dmg;
+    var atkDmg = dot === 0 ? 1 : dmg;  // 侧撞=1，对撞=dmg（攻击方无上限）
+    var defDmg = dot === 0 ? dmg : Math.min(dmg, ship.length);  // 对撞时防守方伤害不超过撞击船体积
 
     // 条件1：对敌伤害 > 己方伤害（净收益）
     if (defDmg > atkDmg) return 20 + (defDmg - atkDmg) * 5;
@@ -1401,6 +1420,7 @@ function recklessScore(action, shipIdx) {
     var distChange = oldDist - newDist;
     // 远离敌人时大幅扣分
     if (distChange < 0) distChange *= 3; // 越跑越远，严重扣分
+    if (_wouldBeGrounded(ship, nc, nr)) distChange -= 5;
     return Math.max(12, 10 + distChange * 5);
   }
   if (action.type === 'turn') {
