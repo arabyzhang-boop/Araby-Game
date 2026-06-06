@@ -343,14 +343,16 @@ function drawTerrain() {
   }
 }
 
-// ── 浅滩（3个小点，回合开始时中/大型船搁浅） ──
+// ── 浅滩（5个小点，回合开始时中/大型船搁浅） ──
 function drawShoal(col, row) {
   var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
   ctx.save();
   var dots = [
-    { dx: 0.30, dy: 0.35 },
-    { dx: 0.70, dy: 0.35 },
-    { dx: 0.50, dy: 0.70 }
+    { dx: 0.25, dy: 0.30 },
+    { dx: 0.75, dy: 0.30 },
+    { dx: 0.50, dy: 0.50 },
+    { dx: 0.25, dy: 0.70 },
+    { dx: 0.75, dy: 0.70 }
   ];
   ctx.fillStyle = '#7a6248';
   for (var di = 0; di < dots.length; di++) {
@@ -361,16 +363,14 @@ function drawShoal(col, row) {
   ctx.restore();
 }
 
-// ── 中浅滩（5个小点，回合开始时大型船搁浅） ──
+// ── 中浅滩（3个小点，回合开始时大型船搁浅） ──
 function drawMediumShoal(col, row) {
   var x = col * CELL_SIZE, y = row * CELL_SIZE, s = CELL_SIZE;
   ctx.save();
   var dots = [
-    { dx: 0.25, dy: 0.30 },
-    { dx: 0.75, dy: 0.30 },
-    { dx: 0.50, dy: 0.50 },
-    { dx: 0.25, dy: 0.70 },
-    { dx: 0.75, dy: 0.70 }
+    { dx: 0.30, dy: 0.35 },
+    { dx: 0.70, dy: 0.35 },
+    { dx: 0.50, dy: 0.70 }
   ];
   ctx.fillStyle = '#8b7355';
   for (var di = 0; di < dots.length; di++) {
