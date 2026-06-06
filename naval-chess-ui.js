@@ -21,7 +21,7 @@ function updateInfoPanel() {
       elSkillInfoItem.style.display = 'none';
       elShipSkill.innerHTML = '—';
     }
-    elActionsLeft.textContent = ship.submerged ? `下潜中(${ship.submergedTurns}回合)` : (ship.boardingTargets.length > 0 ? '接舷战中' : (ship.grounded ? '搁浅' : ship.actionsRemaining));
+    elActionsLeft.textContent = ship.submerged ? `下潜中(${ship.submergedTurns}回合)` : (ship.boardingTargets.length > 0 ? '接舷战中' : (ship.grounded ? ship.actionsRemaining + '（搁浅中）' : ship.actionsRemaining));
     elShipHP.textContent    = `${ship.hp} / ${ship.maxHp}${ship.boardingTargets.length > 0 ? ' ⚔' : ''}`;
     // 面板显示选中舰船所属势力
     var isAiShip = (gameMode === 'ai' || inCampaign) && ship.playerIndex === 1;
