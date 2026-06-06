@@ -1058,7 +1058,7 @@ function greedyScore(action, shipIdx) {
     }
     var distChange = oldDist - newDist; // 正=接近，负=远离
     score = Math.max(6, 8 + (distChange > 0 ? distChange * 4 : distChange * 1));
-    if (_wouldBeGrounded(ship, nc, nr)) score -= 15;
+    if (_wouldBeGrounded(ship, nc, nr)) score = -10;
   } else if (action.type === 'turn') {
     score = 3;
   } else if (action.type === 'broadside') {
@@ -1283,7 +1283,15 @@ function timidScore(action, shipIdx) {
     // 距敌1格以内才略扣（舷炮最佳距离2-4格，1格是撞击/接舷预备位）
     if (newDist <= 1 && oldDist > 1) moveScore -= 3;
     // 已经非常接近时不鼓励继续前冲，转交攻击行动评分接管
-    if (_wouldBeGrounded(ship, nc, nr)) moveScore -= 20;
+    if (_wouldBeGrounded(ship, nc, nr)) moveScore = -10;
+    // 检测前方是否即将阻塞
+    var beyondCol = nc + dv.dx * step, beyondRow = nr + dv.dy * step;
+    var beyondCells = _simCellsAt(ship, beyondCol, beyondRow);
+    for (var bci = 0; bci < beyondCells.length; bci++) {
+      var bc = beyondCells[bci];
+      if (bc.col < 0 || bc.col >= GRID_SIZE || bc.row < 0 || bc.row >= GRID_SIZE ||
+          _simOccupied(bc.col, bc.row, shipIdx, ship.length)) { moveScore -= 20; break; }
+    }
     return Math.max(10, moveScore);
   }
 
@@ -1302,7 +1310,17 @@ function timidScore(action, shipIdx) {
       }
       if (facing) break;
     }
-    return facing ? 7 : 2;
+    // 若当前朝向已阻塞，转向应更优先
+    var step3 = ship.submerged ? 2 : 1;
+    var fwdDv = DIR_VECTORS[ship.direction];
+    var fwdCol = ship.col + fwdDv.dx * step3, fwdRow = ship.row + fwdDv.dy * step3;
+    var fwdCells = _simCellsAt(ship, fwdCol, fwdRow);
+    var fwdBlocked = false;
+    for (var fci = 0; fci < fwdCells.length; fci++) {
+      if (fwdCells[fci].col < 0 || fwdCells[fci].col >= GRID_SIZE || fwdCells[fci].row < 0 || fwdCells[fci].row >= GRID_SIZE ||
+          _simOccupied(fwdCells[fci].col, fwdCells[fci].row, shipIdx, ship.length)) { fwdBlocked = true; break; }
+    }
+    return facing ? (fwdBlocked ? 10 : 7) : (fwdBlocked ? 6 : 2);
   }
 
   if (action.type === 'broadside') {
@@ -1420,8 +1438,17 @@ function recklessScore(action, shipIdx) {
     var distChange = oldDist - newDist;
     // 远离敌人时大幅扣分
     if (distChange < 0) distChange *= 3; // 越跑越远，严重扣分
-    if (_wouldBeGrounded(ship, nc, nr)) distChange -= 5;
-    return Math.max(12, 10 + distChange * 5);
+    var moveScore = 10 + distChange * 5;
+    if (_wouldBeGrounded(ship, nc, nr)) moveScore -= 20;
+    // 检测前方是否即将阻塞（地图边缘/障碍），避免盲目前进
+    var beyondCol = nc + dv.dx * step, beyondRow = nr + dv.dy * step;
+    var beyondCells = _simCellsAt(ship, beyondCol, beyondRow);
+    for (var bci = 0; bci < beyondCells.length; bci++) {
+      var bc = beyondCells[bci];
+      if (bc.col < 0 || bc.col >= GRID_SIZE || bc.row < 0 || bc.row >= GRID_SIZE ||
+          _simOccupied(bc.col, bc.row, shipIdx, ship.length)) { moveScore -= 25; break; }
+    }
+    return Math.max(12, moveScore);
   }
   if (action.type === 'turn') {
     // 转向面对敌人则高分
@@ -1439,7 +1466,17 @@ function recklessScore(action, shipIdx) {
       }
       if (facing) break;
     }
-    return facing ? 8 : 2;
+    // 若当前朝向已阻塞（前方无路），转向应更优先
+    var step3 = ship.submerged ? 2 : 1;
+    var fwdDv = DIR_VECTORS[ship.direction];
+    var fwdCol = ship.col + fwdDv.dx * step3, fwdRow = ship.row + fwdDv.dy * step3;
+    var fwdCells = _simCellsAt(ship, fwdCol, fwdRow);
+    var fwdBlocked = false;
+    for (var fci = 0; fci < fwdCells.length; fci++) {
+      if (fwdCells[fci].col < 0 || fwdCells[fci].col >= GRID_SIZE || fwdCells[fci].row < 0 || fwdCells[fci].row >= GRID_SIZE ||
+          _simOccupied(fwdCells[fci].col, fwdCells[fci].row, shipIdx, ship.length)) { fwdBlocked = true; break; }
+    }
+    return facing ? (fwdBlocked ? 12 : 8) : (fwdBlocked ? 7 : 2);
   }
   if (action.type === 'broadside') {
     var bs = _simCountBroadside(ship);
@@ -1476,6 +1513,11 @@ function recklessSearch() {
     if (a.shipIdx === undefined) continue;
     var sc = recklessScore(a, a.shipIdx);
     if (sc > bestScore) { bestScore = sc; best = a; }
+  }
+  // 如果最佳行动分数太低，选择结束回合而非盲目前进
+  if (bestScore < 12) {
+    var endAct = getLegalActions(1).filter(function(a) { return a.type === 'endTurn'; });
+    if (endAct.length > 0) return endAct[0];
   }
   return best;
 }
