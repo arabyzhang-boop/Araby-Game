@@ -89,11 +89,14 @@ server.on('connection', (ws) => {
   let playerInfo = null; // { room, playerIndex }
   let msgCount = 0;
 
-  // 心跳
+  // 心跳（容忍3次丢失，移动网络波动不轻易断连）
   ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+  ws.missedPings = 0;
+  ws.on('pong', () => { ws.isAlive = true; ws.missedPings = 0; });
 
   ws.on('message', (raw) => {
+    // 任何应用层消息都证明连接活跃，重置心跳计数
+    ws.missedPings = 0;
     let msg;
     try { msg = JSON.parse(raw); } catch (e) {
       console.log('>>> 收到无效 JSON:', String(raw).slice(0, 80));
@@ -325,17 +328,23 @@ server.on('connection', (ws) => {
   });
 });
 
-// ── 心跳检测（每18秒，确保 Render 负载均衡器不判定空闲断开） ──
+// ── 心跳检测（每12秒，容忍3次丢失=36秒，Render 负载均衡器55秒空闲断连之前有充足余量） ──
 const heartbeat = setInterval(() => {
   server.clients.forEach((ws) => {
     if (ws.isAlive === false) {
-      console.log('客户端心跳超时，断开连接');
-      return ws.terminate();
+      ws.missedPings = (ws.missedPings || 0) + 1;
+      if (ws.missedPings >= 3) {
+        console.log('客户端心跳超时（连续3次无响应），断开连接');
+        return ws.terminate();
+      }
+      // 未达到3次，继续尝试 ping
+    } else {
+      ws.missedPings = 0;
     }
     ws.isAlive = false;
     ws.ping();
   });
-}, 18000);
+}, 12000);
 
 server.on('close', () => clearInterval(heartbeat));
 

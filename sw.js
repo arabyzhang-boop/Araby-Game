@@ -3,7 +3,7 @@
 //   HTML/JS/CSS  → 网络优先（保证实时更新）
 //   MP3/PNG 等媒体 → 缓存优先，后台更新（大文件秒加载）
 
-const CACHE_NAME = 'naval-chess-v8';
+const CACHE_NAME = 'naval-chess-v9';
 const PRECACHE_FILES = [
   './',
   'naval-chess.html',
@@ -99,21 +99,27 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // ── HTML / JS / CSS / 其他：网络优先 ──
-  event.respondWith(
-    fetch(event.request).then(function(response) {
-      if (response && response.status === 200) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
+  // ── 应用核心文件（HTML / JS / CSS / JSON）：网络优先，限已知类型 ──
+  if (/\.(html|js|css|json)$/i.test(path) || path === '/' || path.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        if (response && response.status === 200) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {
+        return caches.match(event.request).then(function(cached) {
+          if (cached) return cached;
+          return new Response('', { status: 408 });
         });
-      }
-      return response;
-    }).catch(function() {
-      return caches.match(event.request).then(function(cached) {
-        if (cached) return cached;
-        return new Response('', { status: 408 });
-      });
-    })
-  );
+      })
+    );
+    return;
+  }
+
+  // ── 其他请求（WebView内部请求、favicon等）：纯网络，不缓存 ──
+  event.respondWith(fetch(event.request));
 });

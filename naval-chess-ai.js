@@ -1021,6 +1021,18 @@ function _wouldBeGrounded(ship, col, row) {
   return false;
 }
 
+/** 计算从指定位置开始，需要前进几步才能完全脱离搁浅（无法脱离则返回999） */
+function _stepsToClearShoal(ship, col, row) {
+  var dv = DIR_VECTORS[ship.direction];
+  var step = ship.submerged ? 2 : 1;
+  var cc = col, cr = row;
+  for (var s = 0; s < GRID_SIZE; s++) {
+    if (!_wouldBeGrounded(ship, cc, cr)) return s;
+    cc += dv.dx * step; cr += dv.dy * step;
+  }
+  return 999;
+}
+
 function greedyScore(action, shipIdx) {
   var ship = ships[shipIdx];
   var score = 1;
@@ -1058,7 +1070,12 @@ function greedyScore(action, shipIdx) {
     }
     var distChange = oldDist - newDist; // 正=接近，负=远离
     score = Math.max(6, 8 + (distChange > 0 ? distChange * 4 : distChange * 1));
-    if (_wouldBeGrounded(ship, nc, nr)) score = -10;
+    if (_wouldBeGrounded(ship, nc, nr)) {
+      var stepsToClear = _stepsToClearShoal(ship, nc, nr);
+      var actionsAfter = ship.actionsRemaining - 1;
+      if (actionsAfter < stepsToClear) score -= 25;
+      else score -= 5;
+    }
   } else if (action.type === 'turn') {
     score = 3;
   } else if (action.type === 'broadside') {
@@ -1283,7 +1300,13 @@ function timidScore(action, shipIdx) {
     // 距敌1格以内才略扣（舷炮最佳距离2-4格，1格是撞击/接舷预备位）
     if (newDist <= 1 && oldDist > 1) moveScore -= 3;
     // 已经非常接近时不鼓励继续前冲，转交攻击行动评分接管
-    if (_wouldBeGrounded(ship, nc, nr)) moveScore = -10;
+    if (_wouldBeGrounded(ship, nc, nr)) {
+      // 计算脱离搁浅所需步数，若剩余行动力不足则严厉扣分
+      var stepsToClear = _stepsToClearShoal(ship, nc, nr);
+      var actionsAfter = ship.actionsRemaining - 1;
+      if (actionsAfter < stepsToClear) moveScore -= 30;
+      else moveScore -= 6;
+    }
     // 检测前方是否即将阻塞
     var beyondCol = nc + dv.dx * step, beyondRow = nr + dv.dy * step;
     var beyondCells = _simCellsAt(ship, beyondCol, beyondRow);
@@ -1373,7 +1396,13 @@ function timidScore(action, shipIdx) {
     return 6;
   }
 
-  if (action.type === 'endTurn') return -5;
+  if (action.type === 'endTurn') {
+    // 若有己方舰船停在浅滩上，结束回合将导致下回合搁浅，严厉扣分
+    for (var gi = 0; gi < ships.length; gi++) {
+      if (ships[gi].playerIndex === 1 && isShipGrounded(ships[gi])) return -30;
+    }
+    return -5;
+  }
   return 0;
 }
 
@@ -1439,7 +1468,12 @@ function recklessScore(action, shipIdx) {
     // 远离敌人时大幅扣分
     if (distChange < 0) distChange *= 3; // 越跑越远，严重扣分
     var moveScore = 10 + distChange * 5;
-    if (_wouldBeGrounded(ship, nc, nr)) moveScore -= 20;
+    if (_wouldBeGrounded(ship, nc, nr)) {
+      var stepsToClear = _stepsToClearShoal(ship, nc, nr);
+      var actionsAfter = ship.actionsRemaining - 1;
+      if (actionsAfter < stepsToClear) moveScore -= 25;
+      else moveScore -= 4;
+    }
     // 检测前方是否即将阻塞（地图边缘/障碍），避免盲目前进
     var beyondCol = nc + dv.dx * step, beyondRow = nr + dv.dy * step;
     var beyondCells = _simCellsAt(ship, beyondCol, beyondRow);
@@ -1498,7 +1532,13 @@ function recklessScore(action, shipIdx) {
     if (action.skill === 'ammoSupport') return 4;
     return 10;
   }
-  if (action.type === 'endTurn') return -50; // 绝不主动结束
+  if (action.type === 'endTurn') {
+    // 若有己方舰船停在浅滩上，结束回合将导致下回合搁浅
+    for (var gi = 0; gi < ships.length; gi++) {
+      if (ships[gi].playerIndex === 1 && isShipGrounded(ships[gi])) return -30;
+    }
+    return -50; // 绝不主动结束
+  }
   return 0;
 }
 

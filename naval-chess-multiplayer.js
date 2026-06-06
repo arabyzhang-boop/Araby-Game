@@ -14,6 +14,9 @@ var mpGameSpeed = 'classic'; // 联机模式速度
 var mpWaitingForTurnSwitch = false; // 等待服务器确认回合切换
 var mpTurnSwitchTimer = null; // 回合切换超时重试定时器
 var mpPingTimer = null; // 心跳定时器
+var mpReconnectAttempts = 0; // 重连尝试次数
+var mpReconnectTimer = null; // 重连定时器
+var mpManualDisconnect = false; // 是否主动断开（主动断开不重连）
 
 // 联机服务器地址：本地测试用 localhost，部署后替换为 Render 地址
 // file:// 协议或本地访问 → 连本地服务器；否则连生产环境
@@ -92,24 +95,27 @@ function mpShowTurnNotification() {
 
 // ── WebSocket ──
 function mpConnect() {
+  mpManualDisconnect = false;
   if (mpSocket) { mpSocket.close(); }
   console.log('[MP] 连接目标:', MP_SERVER);
   mpStatus('正在连接服务器…');
   mpSocket = new WebSocket(MP_SERVER);
   mpSocket.onopen = function() {
     mpConnected = true;
+    mpReconnectAttempts = 0;
+    clearTimeout(mpReconnectTimer);
     mpStatus('已连接 ✓');
     if (mpPendingSend) {
       mpSocket.send(JSON.stringify(mpPendingSend));
       mpPendingSend = null;
     }
-    // 启动心跳（每12秒发送ping，防止 Render/负载均衡器空闲断开）
+    // 启动心跳（每8秒发送ping，Render负载均衡器55秒空闲断连前有充足保活）
     clearInterval(mpPingTimer);
     mpPingTimer = setInterval(function() {
       if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
         mpSocket.send(JSON.stringify({ type: 'ping' }));
       }
-    }, 12000);
+    }, 8000);
   };
   mpSocket.onmessage = function(e) {
     try {
@@ -121,11 +127,29 @@ function mpConnect() {
   };
   mpSocket.onclose = function() {
     mpConnected = false;
-    mpStatus('连接已断开', true);
     clearInterval(mpPingTimer);
+    // 主动断开不重连
+    if (mpManualDisconnect) return;
+    // 游戏已结束不重连
+    if (gameOver && !mpGameStarted) return;
+    // 自动重连（最多5次，间隔递增）
+    if (mpReconnectAttempts < 5) {
+      mpReconnectAttempts++;
+      var delay = Math.min(1000 * mpReconnectAttempts, 8000);
+      mpStatus('连接断开，' + delay / 1000 + '秒后重连…(' + mpReconnectAttempts + '/5)', true);
+      mpReconnectTimer = setTimeout(function() {
+        if (!mpManualDisconnect) mpConnect();
+      }, delay);
+    } else {
+      mpStatus('连接已断开，请返回重试', true);
+      if (mpGameStarted && !gameOver) {
+        mpEndGame('与服务器连接中断，游戏终止', false);
+      }
+    }
   };
   mpSocket.onerror = function() {
-    mpStatus('无法连接服务器，请确认服务器已启动', true);
+    // onerror 后通常跟着 onclose，由 onclose 统一处理重连
+    mpStatus('连接异常，正在重试…', true);
   };
 }
 
@@ -767,9 +791,12 @@ function mpEndGame(msg, isWinner) {
 }
 
 function cleanupMultiplayer() {
+  mpManualDisconnect = true;
   clearTimeout(mpTurnSwitchTimer);
+  clearTimeout(mpReconnectTimer);
   clearInterval(mpPingTimer);
   mpWaitingForTurnSwitch = false;
+  mpReconnectAttempts = 0;
   if (mpSocket) { mpSocket.close(); mpSocket = null; }
   mpRoom = null; mpPlayerIndex = -1; mpGameStarted = false; mpIsHost = false;
   btnReset.textContent = '重置';
@@ -855,4 +882,30 @@ document.getElementById('btnMpCancel').addEventListener('click', function() {
   mpResetMenuState();
   mpMenuScreen.classList.remove('hidden');
   mpMenuScreen.style.display = 'flex';
+});
+
+// ── 页面可见性变化处理（防止后台定时器被浏览器节流导致假死断连） ──
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // 进入后台前立即发一次 ping，确保连接活跃
+    if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+      mpSocket.send(JSON.stringify({ type: 'ping' }));
+    }
+  } else {
+    // 回到前台：立即发 ping 验证连接，若已断开则触发重连
+    if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+      mpSocket.send(JSON.stringify({ type: 'ping' }));
+    } else if (mpConnected === false && !mpManualDisconnect && mpRoom) {
+      // 连接已丢失且非主动断开，立即重连
+      mpReconnectAttempts = 0;
+      mpConnect();
+    }
+    // 重新启动心跳（后台期间可能被浏览器暂停）
+    clearInterval(mpPingTimer);
+    mpPingTimer = setInterval(function() {
+      if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+        mpSocket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 8000);
+  }
 });

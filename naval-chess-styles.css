@@ -464,7 +464,7 @@
     .ship-pick-price { font-size: 12px; }
     .campaign-card, .library-card { padding: 16px 12px; max-width: 98vw; }
     .campaign-grid, .library-grid { gap: 5px; }
-    .campaign-level { font-size: 12px; padding: 12px 6px; }
+    .campaign-level { font-size: 12px; padding: 12px 6px; min-width: 80px; min-height: 66px; }
     .lib-ship-btn { padding: 10px 6px; }
     .lib-ship-name { font-size: 11px; letter-spacing: 0.5px; }
     .lib-ship-flag svg { width: 22px; height: 18px; }
@@ -1098,6 +1098,8 @@
   transition: all 0.15s;
   box-shadow: 0 3px 0 #1a1008, 0 4px 8px rgba(0,0,0,0.3);
   text-align: center;
+  min-height: 80px;
+  min-width: 100px;
 }
 .campaign-level:hover {
   background: linear-gradient(180deg, #795548 0%, #5d4037 100%);

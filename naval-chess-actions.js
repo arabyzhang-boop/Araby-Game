@@ -29,6 +29,8 @@ function afterShipAction(ship, actionDesc, cost) {
   clearBrokenBoarding(); // 移动/转向后清理不再接触的接舷关系
 
   if (ship.actionsRemaining <= 0) {
+    // 行动耗尽时立即检测是否搁浅
+    ship.grounded = isShipGrounded(ship);
     if (!mpRemoteExec) {
       selectedShipIndex = -1;
       log(`舰船行动力耗尽，已取消选中`);

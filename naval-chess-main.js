@@ -525,12 +525,17 @@ document.getElementById('btnOpenLibrary').addEventListener('click', function() {
     showUpdateToast();
   });
 
-  // 每 2 分钟主动检查更新
-  navigator.serviceWorker.ready.then(function(reg) {
-    setInterval(function() {
+  // 本地部署（file:// / localhost）不需要定时检查更新，APK 更新走应用商店
+  var isLocalDeploy = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isLocalDeploy) {
+    navigator.serviceWorker.ready.then(function(reg) {
+      // 首次加载检查一次，之后每6小时检查（减轻缓存压力）
       reg.update().catch(function(){});
-    }, 2 * 60 * 1000);
-  });
+      setInterval(function() {
+        reg.update().catch(function(){});
+      }, 6 * 60 * 60 * 1000);
+    });
+  }
 
   function showUpdateToast() {
     if (document.getElementById('updateToast')) return;
