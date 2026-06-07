@@ -24,8 +24,10 @@ console.log(`Naval Chess 联机服务器已启动，端口 ${PORT}`);
 //   currentTurn: 0 | 1,      // 当前可行动的玩家索引
 //   turnNumber: 1,
 //   createdAt: timestamp,
+//   disconnectTimers: [timer0, timer1], // 断线清理倒计时
 // }
 const rooms = {};
+const DISCONNECT_GRACE = 60000; // 60秒断线宽限期，期内允许重连
 
 // WebSocket → { room, playerIndex }
 const playerMap = new Map();
@@ -73,6 +75,10 @@ function cleanupRoom(roomCode, reason) {
   const room = rooms[roomCode];
   if (!room) return;
   console.log(`[${roomCode}] 房间关闭: ${reason || '正常'}`);
+  // 清除所有断线倒计时
+  if (room.disconnectTimers) {
+    room.disconnectTimers.forEach(function(t) { if (t) clearTimeout(t); });
+  }
   for (const player of room.players) {
     if (player) {
       send(player, { type: 'roomClosed', reason: reason || '房间已关闭' });
@@ -297,6 +303,41 @@ server.on('connection', (ws) => {
         break;
       }
 
+      // ── 重连加入 ──
+      case 'rejoin': {
+        const code = msg.room;
+        const rejoinIdx = msg.playerIndex;
+        const room = rooms[code];
+        if (!room) {
+          send(ws, { type: 'error', message: '房间已不存在，无法重连' });
+          return;
+        }
+        if (rejoinIdx !== 0 && rejoinIdx !== 1) {
+          send(ws, { type: 'error', message: '无效的玩家索引' });
+          return;
+        }
+        // 检查该槽位是否为空（原玩家已断开）
+        if (room.players[rejoinIdx]) {
+          send(ws, { type: 'error', message: '该位置已被占用' });
+          return;
+        }
+        // 重连成功：填充槽位，取消宽限期计时器
+        room.players[rejoinIdx] = ws;
+        playerInfo = { room: code, playerIndex: rejoinIdx };
+        playerMap.set(ws, playerInfo);
+        if (room.disconnectTimers && room.disconnectTimers[rejoinIdx]) {
+          clearTimeout(room.disconnectTimers[rejoinIdx]);
+          room.disconnectTimers[rejoinIdx] = null;
+        }
+        console.log(`[${code}] 玩家 ${rejoinIdx} 重连成功`);
+        send(ws, { type: 'rejoined', room: code, playerIndex: rejoinIdx });
+        // 通知对手
+        const otherIdx2 = 1 - rejoinIdx;
+        const other2 = room.players[otherIdx2];
+        send(other2, { type: 'opponentRejoined' });
+        break;
+      }
+
       default:
         if (msgCount <= 5) console.log(`>>> 未知消息类型: type=${msg.type}`);
         break;
@@ -306,21 +347,39 @@ server.on('connection', (ws) => {
     }
   });
 
-  // ── 断线处理 ──
+  // ── 断线处理（60秒宽限期，期内允许重连） ──
   ws.on('close', () => {
     console.log('>>> 客户端断开连接');
     if (!playerInfo) return;
     const room = rooms[playerInfo.room];
     if (!room) return;
 
-    const otherIdx = 1 - playerInfo.playerIndex;
+    const myIdx = playerInfo.playerIndex;
+    const otherIdx = 1 - myIdx;
     const other = room.players[otherIdx];
 
-    if (room.phase === 'playing') {
-      send(other, { type: 'opponentDisconnected' });
+    if (!room.disconnectTimers) room.disconnectTimers = [null, null];
+
+    // 清除该玩家的旧计时器（如有）
+    if (room.disconnectTimers[myIdx]) clearTimeout(room.disconnectTimers[myIdx]);
+
+    // 设置宽限期倒计时，期内允许 rejoin
+    room.disconnectTimers[myIdx] = setTimeout(() => {
+      console.log(`[${playerInfo.room}] 玩家 ${myIdx} 断线宽限期到期，清理房间`);
+      if (room.phase === 'playing') {
+        send(other, { type: 'opponentDisconnected' });
+      }
+      cleanupRoom(playerInfo.room, '玩家断开连接超时');
+    }, DISCONNECT_GRACE);
+
+    // 通知对手：对方暂时断线（非永久）
+    if (room.phase === 'playing' || room.phase === 'selection') {
+      send(other, { type: 'opponentDisconnected', temporary: true });
     }
-    cleanupRoom(playerInfo.room, '玩家断开连接');
+
     playerMap.delete(ws);
+    // 将该玩家的槽位清空，等待 rejoin 重新填入
+    room.players[myIdx] = null;
   });
 
   ws.on('error', (err) => {
@@ -328,13 +387,13 @@ server.on('connection', (ws) => {
   });
 });
 
-// ── 心跳检测（每12秒，容忍3次丢失=36秒，Render 负载均衡器55秒空闲断连之前有充足余量） ──
+// ── 心跳检测（每12秒，容忍5次丢失=60秒） ──
 const heartbeat = setInterval(() => {
   server.clients.forEach((ws) => {
     if (ws.isAlive === false) {
       ws.missedPings = (ws.missedPings || 0) + 1;
-      if (ws.missedPings >= 3) {
-        console.log('客户端心跳超时（连续3次无响应），断开连接');
+      if (ws.missedPings >= 5) {
+        console.log('客户端心跳超时（连续5次无响应），断开连接');
         return ws.terminate();
       }
       // 未达到3次，继续尝试 ping
