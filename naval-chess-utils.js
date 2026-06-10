@@ -60,7 +60,7 @@ function isTerrainBlocking(col, row, optShipLength) {
   if (!t) return false;
   // 始终阻挡所有舰船的地形
   if (t.type === TERRAIN.MOUNTAIN || t.type === TERRAIN.SNOW_MOUNTAIN ||
-      t.type === TERRAIN.LOW_ISLAND || t.type === TERRAIN.FLAG ||
+      t.type === TERRAIN.LOW_ISLAND ||
       t.type === TERRAIN.SUPPLY || t.type === TERRAIN.POWDER_KEG) return true;
   return false;
 }
