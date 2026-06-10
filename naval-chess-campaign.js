@@ -435,7 +435,7 @@ function getCampaignFamousPool(levelId) {
 
 // ── 关卡选船：生成9个选项 ──
 function generateCampaignShipOptions(levelId) {
-  var famousPool = getCampaignFamousPool(levelId).slice(); // 可用的名船池
+  var famousPool = getCampaignFamousPool(levelId).slice().sort(function() { return Math.random() - 0.5; }); // 随机打乱名船池
   var options = [];
   var normalId = 1;
 
