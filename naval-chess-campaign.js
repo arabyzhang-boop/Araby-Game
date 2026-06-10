@@ -340,6 +340,76 @@ var campaignLevels = [
   ],
 
     unlockShip: 1 // 通关解锁 famousShipLibrary[1] = 黑珍珠号
+  },
+  { // 关卡 5 — 港口突围
+    id: 5,
+    aiShips: ['安妮女王复仇号'],
+    deployZone: { colMin: 1, colMax: 9, rowMin: 10, rowMax: 18, dirs: [DIR.N, DIR.S],
+      adjacentToTerrain: TERRAIN.MOUNTAIN, dockBroadside: true }, // B11~J19，仅南北朝向确保舷侧贴⛰️
+    enemyFleet: [
+      // 安妮女王复仇号：红色格▼(col 9,row 12)，船头朝南，舰体(col 9, row 11-12)
+      { name: '安妮女王复仇号', length: 2, col: 9, row: 11, direction: DIR.S,
+        skill: famousShipLibrary[5].skill, skillData: famousShipLibrary[5].skillData,
+        flagColor: famousShipLibrary[5].flagColor, flagShape: famousShipLibrary[5].flagShape,
+        flagIcon: famousShipLibrary[5].flagIcon, flagPattern: famousShipLibrary[5].flagPattern,
+        alert: false },
+      // 4艘大型舰艇（警戒中，不主动移动直到敌船进入舷炮射程）
+      { name: '大型舰艇', length: 3, col: 15, row: 0, direction: DIR.S,   // ▼ P1+P2+P3 (15,0)-(15,2)
+        skill: null, skillData: null, alert: true },
+      { name: '大型舰艇', length: 3, col: 9, row: 8, direction: DIR.W,     // ◀ bow (7,8)
+        skill: null, skillData: null, alert: true },
+      { name: '大型舰艇', length: 3, col: 11, row: 10, direction: DIR.S,   // ▼ bow (11,12)
+        skill: null, skillData: null, alert: true },
+      { name: '大型舰艇', length: 3, col: 19, row: 4, direction: DIR.W,    // ◀ R5+S5+T5 (17,4)-(19,4)
+        skill: null, skillData: null, alert: true },
+      // 3艘中型舰艇
+      { name: '中型舰艇', length: 2, col: 8, row: 10, direction: DIR.W,    // ◀ H11+I11 (7,10)-(8,10)
+        skill: null, skillData: null },
+      { name: '中型舰艇', length: 2, col: 10, row: 5, direction: DIR.W,    // ◀ J6+K6 (9,5)-(10,5)
+        skill: null, skillData: null },
+      { name: '中型舰艇', length: 2, col: 14, row: 9, direction: DIR.S,    // ▼ bow (14,10)
+        skill: null, skillData: null },
+      // 4艘小型舰艇
+      { name: '小型舰艇', length: 1, col: 8, row: 2, direction: DIR.S,     // ▼ bow (8,2)
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 14, row: 5, direction: DIR.W,    // ◀ bow (14,5)
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 17, row: 11, direction: DIR.W,   // ◀ bow (17,11)
+        skill: null, skillData: null },
+      { name: '小型舰艇', length: 1, col: 7, row: 12, direction: DIR.W,    // ◀ bow (7,12)
+        skill: null, skillData: null },
+    ],
+    terrain: [].concat(
+      // 左上角山地（模拟海岸线）
+      { col: 0, row: 3, type: TERRAIN.MOUNTAIN },
+      _tr(4,0,1, TERRAIN.MOUNTAIN),
+      _tr(5,0,2, TERRAIN.MOUNTAIN),
+      _tr(6,0,3, TERRAIN.MOUNTAIN),
+      _tr(7,0,4, TERRAIN.MOUNTAIN),
+      _tr(8,0,5, TERRAIN.MOUNTAIN),
+      _tr(9,0,6, TERRAIN.MOUNTAIN),
+      _tr(10,0,1, TERRAIN.MOUNTAIN),
+      _tr(11,0,1, TERRAIN.MOUNTAIN),
+      _tr(12,0,1, TERRAIN.MOUNTAIN),
+      _tr(13,0,1, TERRAIN.MOUNTAIN),
+      { col: 10, row: 13, type: TERRAIN.MOUNTAIN },
+      { col: 0, row: 14, type: TERRAIN.MOUNTAIN },
+      _tr(14,10,11, TERRAIN.MOUNTAIN),
+      { col: 0, row: 15, type: TERRAIN.MOUNTAIN },
+      _tr(15,10,12, TERRAIN.MOUNTAIN),
+      { col: 0, row: 16, type: TERRAIN.MOUNTAIN },
+      _tr(16,10,13, TERRAIN.MOUNTAIN),
+      { col: 0, row: 17, type: TERRAIN.MOUNTAIN },
+      _tr(17,10,14, TERRAIN.MOUNTAIN),
+      { col: 0, row: 18, type: TERRAIN.MOUNTAIN },
+      _tr(18,7,15, TERRAIN.MOUNTAIN),
+      _tr(19,0,16, TERRAIN.MOUNTAIN),
+      // 港口突围胜利点（右上角）
+      { col: 19, row: 0, type: TERRAIN.FLAG }
+    ),
+    // 港口突围特殊胜利条件
+    hasFlagVictory: true,
+    unlockShip: 5 // 通关解锁 famousShipLibrary[5] = 安妮女王复仇号
   }
 ];
 
@@ -449,13 +519,18 @@ function initCampaignGame(redPicks) {
       flagColor: def.flagColor, flagShape: def.flagShape,
       flagIcon: def.flagIcon, flagPattern: def.flagPattern
     }));
+    // 设置警戒状态（关卡5的敌方大型舰船初始警戒中）
+    if (def.alert) {
+      ships[ships.length - 1].alert = true;
+    }
   }
 
   // 玩家舰队随机部署（此时敌舰已存在，placeFleet 的 isCellOccupied 会避开）
   var redFleet = (redPicks && redPicks.length > 0) ? redPicks : getDefaultFleet();
   var dz = level.deployZone;
   if (dz) {
-    placeFleet(redFleet, 0, dz.colMin, dz.colMax, dz.dirs, dz.rowMin, dz.rowMax);
+    placeFleet(redFleet, 0, dz.colMin, dz.colMax, dz.dirs, dz.rowMin, dz.rowMax,
+      dz.adjacentToTerrain ? { adjacentToTerrain: dz.adjacentToTerrain } : undefined);
   } else if (campaignLevelId >= 2) {
     placeFleet(redFleet, 0, 5, 10, [DIR.N, DIR.E, DIR.S], 6, 15);
   } else {

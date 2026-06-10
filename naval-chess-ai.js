@@ -1912,6 +1912,62 @@ function aiTakeTurn() {
       return;
     }
 
+    // 警戒中舰船：检测是否有敌船进入舷炮射程，若有则解除警戒并开火；无则跳过本回合
+    for (var ai = 0; ai < ships.length; ai++) {
+      var alertShip = ships[ai];
+      if (alertShip.playerIndex !== 1 || !alertShip.alert || alertShip.actionsRemaining <= 0) continue;
+      // 收集所有红方舰船格子
+      var redCellsAll = [];
+      for (var ri = 0; ri < ships.length; ri++) {
+        if (ships[ri].playerIndex === 0 && ships[ri].hp > 0) {
+          var rc = getShipCells(ships[ri]);
+          for (var rci = 0; rci < rc.length; rci++) redCellsAll.push(rc[rci]);
+        }
+      }
+      // 检查舷炮射程内是否有红方舰船
+      var inRange = false;
+      var dvAlert = DIR_VECTORS[alertShip.direction];
+      var leftDir = (alertShip.direction + 3) % 4;
+      var rightDir = (alertShip.direction + 1) % 4;
+      var dvLeft = DIR_VECTORS[leftDir];
+      var dvRight = DIR_VECTORS[rightDir];
+      for (var li = 0; li < alertShip.length && !inRange; li++) {
+        var sx = alertShip.col + dvAlert.dx * li;
+        var sy = alertShip.row + dvAlert.dy * li;
+        // 检查左右两侧1-2格范围
+        for (var d = 1; d <= 2 && !inRange; d++) {
+          var lx = sx + dvLeft.dx * d, ly = sy + dvLeft.dy * d;
+          var rx = sx + dvRight.dx * d, ry = sy + dvRight.dy * d;
+          for (var rci = 0; rci < redCellsAll.length; rci++) {
+            if ((redCellsAll[rci].col === lx && redCellsAll[rci].row === ly) ||
+                (redCellsAll[rci].col === rx && redCellsAll[rci].row === ry)) {
+              inRange = true; break;
+            }
+          }
+        }
+      }
+      if (inRange && alertShip.broadsideCount < (alertShip.maxBroadsideCount || 1)) {
+        // 解除警戒，立即开火
+        alertShip.alert = false;
+        selectedShipIndex = ai;
+        log('⚠️ ' + shipName(ai) + ' 警戒解除！发现敌船进入舷炮射程，立即开火！');
+        updateInfoPanel(); render();
+        setTimeout(function() {
+          if (gameOver || currentPlayerIndex !== 1) return;
+          fireBroadside();
+          updateInfoPanel(); render();
+          if (currentPlayerIndex === 1 && !gameOver) {
+            setTimeout(function() { aiTakeTurn(); }, 300);
+          }
+        }, 350);
+        return;
+      }
+      // 无敌人进入射程：警戒中舰船跳过本回合行动
+      if (!inRange) {
+        alertShip.actionsRemaining = 0;
+      }
+    }
+
     // 按难度选择决策系统
     aiThinking = true;
     var bestAction;

@@ -38,6 +38,9 @@ function afterShipAction(ship, actionDesc, cost) {
   }
 
   checkDevourContacts();
+  // 关卡特殊胜利：检查玩家是否占据旗帜格
+  if (inCampaign) checkFlagVictory();
+  if (gameOver) return;
   if (isCurrentPlayerExhausted() && !(mpGameStarted && mpRemoteExec)) {
     if (mpGameStarted) {
       // 联机模式：向服务器发送 endTurn，等待 turnSwitched，不本地切换

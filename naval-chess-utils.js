@@ -246,7 +246,8 @@ function createShip(props) {
     submerged: false, submergedTurns: 0, submergeUsed: false,
     bowCannonUsed: false, greekFireUsed: false,
     devourTarget: -1, devourProgress: 0,
-    sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0, grounded: false
+    sharksUsed: false, minesPlaced: 0, ironArmorMoves: 0, supplyUsed: 0, grounded: false,
+    alert: props.alert || false
   };
   // 应用名船被动技能
   if (sd) {

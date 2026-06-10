@@ -168,9 +168,68 @@ function removeShip(shipIndex) {
 }
 
 // ── 胜利检查 ──
+// ── 检查玩家是否占据旗帜格（关卡特殊胜利条件） ──
+function checkFlagVictory() {
+  if (gameOver) return;
+  var level = inCampaign ? campaignLevels[campaignLevelId - 1] : null;
+  if (!level || !level.hasFlagVictory) return;
+  // 查找旗帜格
+  var flagCell = null;
+  for (var ti = 0; ti < terrain.length; ti++) {
+    if (terrain[ti].type === TERRAIN.FLAG) { flagCell = terrain[ti]; break; }
+  }
+  if (!flagCell) return;
+  // 检查玩家（红方）是否有舰船占据旗帜格
+  for (var si = 0; si < ships.length; si++) {
+    var s = ships[si];
+    if (s.playerIndex !== 0) continue;
+    var cells = getShipCells(s);
+    for (var ci = 0; ci < cells.length; ci++) {
+      if (cells[ci].col === flagCell.col && cells[ci].row === flagCell.row) {
+        // 玩家占据旗帜格，立即胜利
+        triggerFlagVictory();
+        return;
+      }
+    }
+  }
+}
+
+function triggerFlagVictory() {
+  if (gameOver) return;
+  gameOver = true;
+  var pNames = ['葡萄牙帝国', '荷兰东印度公司'];
+  var winner = 0;
+  var kills = playerKills[winner];
+  document.getElementById('victoryFaction').textContent = pNames[winner] + ' 占领了港口！';
+  document.getElementById('victoryTurnNum').textContent = currentTurn;
+  document.getElementById('victoryShipsLeft').textContent = ships.filter(function(s) { return s.playerIndex === winner; }).length;
+  document.getElementById('victoryRamKills').textContent = kills.ram;
+  document.getElementById('victoryBroadsideKills').textContent = kills.broadside;
+  document.getElementById('victoryBoardingKills').textContent = kills.boarding;
+  var titleEl = document.getElementById('victoryTitle');
+  titleEl.textContent = 'VICTORY';
+  titleEl.classList.remove('defeat');
+  updateVictoryStars(getStarRating(winner));
+  var vo = document.getElementById('victoryOverlay');
+  vo.classList.remove('hidden');
+  vo.style.display = 'flex';
+  document.getElementById('btnEndTurn').disabled = true;
+  document.getElementById('btnReset').disabled = true;
+  updateInfoPanel();
+  render();
+  log('—— 港口占领成功！' + pNames[winner] + ' 获得胜利！ ——');
+  if (inCampaign && winner === 0) { completeCurrentLevel(getStarRating(winner)); }
+}
+
 function checkVictory() {
   if (gameOver) return;
   const pNames = ['葡萄牙帝国', '荷兰东印度公司'];
+  // 先检查关卡特殊胜利条件
+  if (inCampaign) {
+    var level = campaignLevels[campaignLevelId - 1];
+    if (level && level.hasFlagVictory) checkFlagVictory();
+  }
+  if (gameOver) return;
   for (let p = 0; p < 2; p++) {
     const alive = ships.filter(function(s) { return s.playerIndex === p; });
     if (alive.length === 0) {
@@ -429,6 +488,10 @@ function switchToNextPlayer() {
   updatePlayerDisplay();
   updateInfoPanel();
   render();
+
+  // 关卡特殊胜利：检查玩家是否占据旗帜格
+  if (inCampaign) checkFlagVictory();
+  if (gameOver) return;
 
   var pNames = ['葡萄牙帝国', '荷兰东印度公司'];
   var who = (gameMode === 'ai' || inCampaign) && currentPlayerIndex === 1 ? '电脑' : '玩家' + (currentPlayerIndex + 1);

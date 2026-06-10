@@ -20,15 +20,17 @@ function isCellAdjacentToFleet(col, row, playerIdx) {
   });
 }
 
-/** 在指定列/行范围和朝向约束内随机放置一支舰队 */
-function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinOverride, rowMaxOverride) {
+/** 在指定列/行范围和朝向约束内随机放置一支舰队。
+ * 可选 opts.adjacentToTerrain：舰船必须至少有一格紧贴该地形类型（用于港口停泊） */
+function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinOverride, rowMaxOverride, opts) {
+  var adjTerrain = (opts && opts.adjacentToTerrain) || null;
   for (const def of fleetDefs) {
     const isSmall = def.length === 1;
     const rowMin = rowMinOverride != null ? rowMinOverride : (isSmall ? 0 : 5);
     const rowMax = rowMaxOverride != null ? rowMaxOverride : (isSmall ? 19 : 14);
     let placed = false;
 
-    for (let attempt = 0; attempt < 300; attempt++) {
+    for (let attempt = 0; attempt < 1200; attempt++) {
       const dir = allowedDirs[Math.floor(Math.random() * allowedDirs.length)];
       const dv = DIR_VECTORS[dir];
       const col = colMin + Math.floor(Math.random() * (colMax - colMin + 1));
@@ -45,6 +47,46 @@ function placeFleet(fleetDefs, playerIndex, colMin, colMax, allowedDirs, rowMinO
         var tCheck = getTerrainAt(cx, cy);
         if (tCheck && ((tCheck.type === TERRAIN.SHOAL && def.length >= 2) || (tCheck.type === TERRAIN.MEDIUM_SHOAL && def.length >= 3))) { valid = false; break; }
         cells.push({ col: cx, row: cy });
+      }
+      // 检查是否需要紧贴指定地形
+      if (valid && adjTerrain) {
+        var dockBroadside = opts && opts.dockBroadside;
+        if (dockBroadside) {
+          // 严格靠港：舰船一舷所有格子必须完全紧贴山地（模拟码头停泊）
+          var leftDir = (dir + 3) % 4;
+          var rightDir = (dir + 1) % 4;
+          var dvLeft = DIR_VECTORS[leftDir];
+          var dvRight = DIR_VECTORS[rightDir];
+          var allLeftTouch = true, allRightTouch = true;
+          for (var ci = 0; ci < cells.length; ci++) {
+            var lx = cells[ci].col + dvLeft.dx;
+            var ly = cells[ci].row + dvLeft.dy;
+            var lt = (lx >= 0 && lx < GRID_SIZE && ly >= 0 && ly < GRID_SIZE) ? getTerrainAt(lx, ly) : null;
+            if (!lt || lt.type !== adjTerrain) allLeftTouch = false;
+            var rx = cells[ci].col + dvRight.dx;
+            var ry = cells[ci].row + dvRight.dy;
+            var rt = (rx >= 0 && rx < GRID_SIZE && ry >= 0 && ry < GRID_SIZE) ? getTerrainAt(rx, ry) : null;
+            if (!rt || rt.type !== adjTerrain) allRightTouch = false;
+          }
+          if (!allLeftTouch && !allRightTouch) valid = false;
+        } else {
+          // 普通模式：至少有一格紧贴即可
+          var hasAdjacent = false;
+          for (var ci = 0; ci < cells.length; ci++) {
+            var cc = cells[ci];
+            for (var dk in DIR_VECTORS) {
+              var dv2 = DIR_VECTORS[dk];
+              var nx = cc.col + dv2.dx;
+              var ny = cc.row + dv2.dy;
+              if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                var nt = getTerrainAt(nx, ny);
+                if (nt && nt.type === adjTerrain) { hasAdjacent = true; break; }
+              }
+            }
+            if (hasAdjacent) break;
+          }
+          if (!hasAdjacent) valid = false;
+        }
       }
       if (valid) {
         ships.push(createShip({
