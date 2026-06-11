@@ -17,6 +17,8 @@ var mpPingTimer = null; // 心跳定时器
 var mpReconnectAttempts = 0; // 重连尝试次数
 var mpReconnectTimer = null; // 重连定时器
 var mpManualDisconnect = false; // 是否主动断开（主动断开不重连）
+var mpReconnecting = false; // 是否正在重连中（防止重复重连）
+var mpLastPongTime = 0; // 最后一次收到服务器响应的时间戳（用于客户端心跳检测）
 
 // 联机服务器地址：本地测试用 localhost，部署后替换为 Render 地址
 // file:// 协议或本地访问 → 连本地服务器；否则连生产环境
@@ -98,43 +100,64 @@ var mpSocketId = 0; // 递增 ID，用于识别当前 socket（旧 socket 的 cl
 
 function mpConnect() {
   mpManualDisconnect = false;
+  mpReconnecting = true;
   mpSocketId++;
   var mySocketId = mpSocketId;
   if (mpSocket) {
     // 标记旧 socket 为"将被替换"，其 onclose 不再触发重连
     mpSocket._replaced = true;
-    mpSocket.close();
+    try { mpSocket.close(); } catch(e) {}
   }
   console.log('[MP] 连接目标:', MP_SERVER, 'socketId=' + mySocketId);
   mpStatus('正在连接服务器…');
-  mpSocket = new WebSocket(MP_SERVER);
+  try {
+    mpSocket = new WebSocket(MP_SERVER);
+  } catch(e) {
+    console.error('[MP] 创建 WebSocket 失败:', e);
+    mpStatus('连接失败，请检查网络', true);
+    mpReconnecting = false;
+    return;
+  }
   mpSocket._socketId = mySocketId;
+  mpLastPongTime = Date.now();
+
   mpSocket.onopen = function() {
     // 确保只有最新的 socket 才处理事件
     if (mpSocket._socketId !== mySocketId) return;
+    console.log('[MP] 连接成功 socketId=' + mySocketId);
     mpConnected = true;
+    mpReconnecting = false;
     mpReconnectAttempts = 0;
     clearTimeout(mpReconnectTimer);
+    mpLastPongTime = Date.now();
     mpStatus('已连接 ✓');
     if (mpPendingSend) {
       mpSocket.send(JSON.stringify(mpPendingSend));
       mpPendingSend = null;
     }
-    // 如果在游戏中重连，发送 rejoin 而不是创建新房间
+    // 如果在游戏中重连，发送 rejoin
     if (mpGameStarted && mpRoom && mpPlayerIndex >= 0) {
       mpSocket.send(JSON.stringify({ type: 'rejoin', room: mpRoom, playerIndex: mpPlayerIndex }));
       log('[联机] 正在重新加入房间…');
     }
-    // 启动心跳（每8秒发送ping，Render负载均衡器55秒空闲断连前有充足保活）
+    // 启动心跳（每8秒发送ping，同时检测是否有pong回来）
     clearInterval(mpPingTimer);
     mpPingTimer = setInterval(function() {
       if (mpSocket && mpSocket._socketId === mySocketId && mpSocket.readyState === WebSocket.OPEN) {
         mpSocket.send(JSON.stringify({ type: 'ping' }));
+        // 客户端心跳检测：超过25秒没收到服务器任何回复 → 判定断线
+        if (Date.now() - mpLastPongTime > 25000) {
+          console.log('[MP] 心跳超时（' + Math.round((Date.now() - mpLastPongTime) / 1000) + '秒无回复），主动断开重连');
+          try { mpSocket.close(); } catch(e) {}
+        }
       }
     }, 8000);
   };
+
   mpSocket.onmessage = function(e) {
     if (mpSocket._socketId !== mySocketId) return;
+    // 收到任何消息都更新时间戳
+    mpLastPongTime = Date.now();
     try {
       var msg = JSON.parse(e.data);
       handleServerMessage(msg);
@@ -142,32 +165,46 @@ function mpConnect() {
       console.error('[MP] 消息处理异常:', err);
     }
   };
-  mpSocket.onclose = function() {
+
+  mpSocket.onclose = function(event) {
     // 忽略已被替换的旧 socket 的 close 事件
-    if (mpSocket._replaced || mpSocket._socketId !== mySocketId) return;
+    if (mpSocket._replaced || (mpSocket._socketId !== mySocketId)) return;
+    console.log('[MP] 连接断开 socketId=' + mySocketId + ' code=' + event.code + ' reason=' + event.reason);
     mpConnected = false;
     clearInterval(mpPingTimer);
     // 主动断开不重连
-    if (mpManualDisconnect) return;
-    // 游戏已结束不重连
-    if (gameOver && !mpGameStarted) return;
-    // 自动重连（最多8次，间隔递增）
+    if (mpManualDisconnect) {
+      mpReconnecting = false;
+      return;
+    }
+    // 游戏已结束且不在游戏中不重连
+    if (gameOver && !mpGameStarted) {
+      mpReconnecting = false;
+      return;
+    }
+    // 自动重连（最多8次，间隔递增：1.5s, 3s, 4.5s, 6s, 7.5s, 9s, 10.5s, 12s）
     if (mpReconnectAttempts < 8) {
       mpReconnectAttempts++;
+      mpReconnecting = true;
       var delay = Math.min(1500 * mpReconnectAttempts, 12000);
-      mpStatus('连接断开，' + delay / 1000 + '秒后重连…(' + mpReconnectAttempts + '/8)', true);
+      mpStatus('连接断开，' + (delay / 1000).toFixed(1) + '秒后重连…(' + mpReconnectAttempts + '/8)', true);
+      log('[联机] 连接断开，' + (delay / 1000).toFixed(1) + '秒后尝试重连…(' + mpReconnectAttempts + '/8)');
+      clearTimeout(mpReconnectTimer);
       mpReconnectTimer = setTimeout(function() {
         if (!mpManualDisconnect) mpConnect();
       }, delay);
     } else {
+      mpReconnecting = false;
       mpStatus('连接已断开，请返回重试', true);
       if (mpGameStarted && !gameOver) {
         mpEndGame('与服务器连接中断，游戏终止', false);
       }
     }
   };
-  mpSocket.onerror = function() {
+
+  mpSocket.onerror = function(err) {
     if (mpSocket._socketId !== mySocketId) return;
+    console.log('[MP] WebSocket 错误 socketId=' + mySocketId, err);
     // onerror 后通常跟着 onclose，由 onclose 统一处理重连
     mpStatus('连接异常，正在重试…', true);
   };
@@ -297,9 +334,14 @@ function handleServerMessage(msg) {
     case 'rejoined':
       // 重连成功：服务器确认已重新加入房间
       mpReconnectAttempts = 0;
+      mpReconnecting = false;
       clearTimeout(mpReconnectTimer);
       mpStatus('已重新加入房间 ✓');
-      log('[联机] 重新加入房间成功，继续游戏');
+      log('[联机] 重新加入房间成功，请求对手同步游戏状态…');
+      // 主动请求对手同步状态（双保险：对手收到 opponentRejoined 也会主动发送）
+      if (mpGameStarted && !gameOver) {
+        mpSocket.send(JSON.stringify({ type: 'requestStateSync' }));
+      }
       // 如果当前是自己的回合，恢复操作
       if (mpPlayerIndex === currentPlayerIndex) {
         btnEndTurn.disabled = false;
@@ -310,28 +352,96 @@ function handleServerMessage(msg) {
       break;
 
     case 'opponentRejoined':
-      // 对手重新加入
+      // 对手重新加入 → 主动发送当前游戏状态同步对手
       log('[联机] 对手已重新连接');
       mpStatus('对手已重新连接');
+      if (mpGameStarted && !gameOver) {
+        mpSendStateSync();
+      }
+      break;
+
+    case 'requestStateSync':
+      // 对手请求状态同步
+      if (mpGameStarted && !gameOver) {
+        mpSendStateSync();
+      }
+      break;
+
+    case 'stateSync':
+      // 收到对手发来的游戏状态快照 → 恢复
+      log('[联机] 收到游戏状态同步，正在恢复…');
+      mpRestoreGameState(msg);
       break;
 
     case 'roomClosed':
       mpWaitingForTurnSwitch = false;
       clearTimeout(mpTurnSwitchTimer);
       mpGameStarted = false;
+      mpReconnecting = false;
       gameOver = true;
       mpStatus('房间已关闭: ' + (msg.reason || '未知原因'), true);
       log('连接已断开，房间已关闭');
       break;
 
+    case 'ping_check':
+      // 服务器应用层心跳探测，回复 pong_check
+      if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
+        mpSocket.send(JSON.stringify({ type: 'pong_check' }));
+      }
+      break;
+
     case 'pong':
-      // 心跳响应，无需处理
+      // 心跳响应，lastPongTime 已在 onmessage 中更新
       break;
 
     case 'error':
       mpStatus(msg.message, true);
       break;
   }
+}
+
+// ── 发送当前游戏状态给对手（用于断线重连后的状态同步） ──
+function mpSendStateSync() {
+  if (!mpSocket || mpSocket.readyState !== WebSocket.OPEN) return;
+  // 深拷贝所有需要同步的状态
+  var stateSync = {
+    type: 'stateSync',
+    ships: JSON.parse(JSON.stringify(ships)),
+    mines: JSON.parse(JSON.stringify(mines)),
+    sharks: JSON.parse(JSON.stringify(sharks)),
+    currentTurn: currentTurn,
+    currentPlayerIndex: currentPlayerIndex,
+    playerKills: JSON.parse(JSON.stringify(playerKills)),
+    terrain: JSON.parse(JSON.stringify(terrain)),
+    selectedShipIndex: -1 // 重连方应取消选中
+  };
+  mpSocket.send(JSON.stringify(stateSync));
+  console.log('[联机] 已发送状态同步，ships=' + stateSync.ships.length);
+}
+
+// ── 恢复从对手收到的游戏状态 ──
+function mpRestoreGameState(state) {
+  if (!state || !state.ships) {
+    log('[联机] 收到空状态，无法恢复');
+    return;
+  }
+  ships = state.ships;
+  mines = state.mines || [];
+  sharks = state.sharks || [];
+  currentTurn = state.currentTurn || 1;
+  currentPlayerIndex = state.currentPlayerIndex || 0;
+  playerKills = state.playerKills || [{ ram: 0, broadside: 0, boarding: 0 }, { ram: 0, broadside: 0, boarding: 0 }];
+  terrain = state.terrain || [];
+  selectedShipIndex = -1;
+  mpWaitingForTurnSwitch = false;
+  clearTimeout(mpTurnSwitchTimer);
+  // 根据当前玩家回合状态恢复按钮
+  btnEndTurn.disabled = (currentPlayerIndex !== mpPlayerIndex);
+  updateInfoPanel();
+  updateActionButtons();
+  render();
+  console.log('[联机] 游戏状态已从对手同步恢复');
+  log('[联机] 游戏状态已同步，继续对战');
 }
 
 // ── 选船同步 ──
@@ -508,10 +618,6 @@ function mpInstallSelectionHooks() {
       }
     }
   };
-
-  // 红方确认后的处理（客机收到时执行）
-  var _origHandleConfirm = mpHandleSelectionConfirmed;
-  // 这个函数会在下面重新定义
 
   skipSelection = function() {
     if (!mpGameStarted && !mpIsHost && mpRoom === null) { _origSkipSelection(); return; }
@@ -842,12 +948,14 @@ function mpEndGame(msg, isWinner) {
 
 function cleanupMultiplayer() {
   mpManualDisconnect = true;
+  mpReconnecting = false;
   clearTimeout(mpTurnSwitchTimer);
   clearTimeout(mpReconnectTimer);
   clearInterval(mpPingTimer);
   mpWaitingForTurnSwitch = false;
   mpReconnectAttempts = 0;
-  if (mpSocket) { mpSocket.close(); mpSocket = null; }
+  if (mpSocket) { try { mpSocket.close(); } catch(e) {} mpSocket = null; }
+  mpConnected = false;
   mpRoom = null; mpPlayerIndex = -1; mpGameStarted = false; mpIsHost = false;
   btnReset.textContent = '重置';
   btnReset.classList.remove('btn-surrender');
@@ -882,7 +990,7 @@ document.getElementById('btnMpHost').addEventListener('click', function() {
 
 function mpCreateRoom() {
   mpPendingSend = { type: 'create', speed: mpGameSpeed };
-  if (!mpConnected || mpSocket.readyState !== WebSocket.OPEN) {
+  if (!mpConnected || (mpSocket && mpSocket.readyState !== WebSocket.OPEN)) {
     mpConnect();
   } else {
     mpSocket.send(JSON.stringify(mpPendingSend));
@@ -904,7 +1012,7 @@ document.getElementById('btnMpJoin').addEventListener('click', function() {
   var code = document.getElementById('mpRoomInput').value.trim();
   if (!code) { mpStatus('请输入房间号', true); return; }
   mpPendingSend = { type: 'join', room: code };
-  if (!mpConnected || mpSocket.readyState !== WebSocket.OPEN) {
+  if (!mpConnected || (mpSocket && mpSocket.readyState !== WebSocket.OPEN)) {
     mpConnect();
   } else {
     mpSocket.send(JSON.stringify(mpPendingSend));
@@ -942,20 +1050,29 @@ document.addEventListener('visibilitychange', function() {
       mpSocket.send(JSON.stringify({ type: 'ping' }));
     }
   } else {
-    // 回到前台：立即发 ping 验证连接，若已断开则触发重连
+    // 回到前台：立即发 ping 验证连接
     if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
       mpSocket.send(JSON.stringify({ type: 'ping' }));
-    } else if (mpConnected === false && !mpManualDisconnect && mpRoom) {
-      // 连接已丢失且非主动断开，立即重连
+      mpLastPongTime = Date.now(); // 重置检测时间，给服务器回复留出时间
+    } else if (!mpManualDisconnect && mpRoom && !mpReconnecting && !mpConnected) {
+      // 连接已丢失且非主动断开，且没有正在进行的重连 → 立即重连
+      console.log('[MP] 页面回到前台，检测到断线，立即重连');
       mpReconnectAttempts = 0;
       mpConnect();
     }
     // 重新启动心跳（后台期间可能被浏览器暂停）
     clearInterval(mpPingTimer);
-    mpPingTimer = setInterval(function() {
-      if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
-        mpSocket.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 8000);
+    if (mpSocket) {
+      var visSid = mpSocket._socketId;
+      mpPingTimer = setInterval(function() {
+        if (mpSocket && mpSocket._socketId === visSid && mpSocket.readyState === WebSocket.OPEN) {
+          mpSocket.send(JSON.stringify({ type: 'ping' }));
+          if (Date.now() - mpLastPongTime > 25000) {
+            console.log('[MP] 心跳超时，主动断开重连');
+            try { mpSocket.close(); } catch(e) {}
+          }
+        }
+      }, 8000);
+    }
   }
 });

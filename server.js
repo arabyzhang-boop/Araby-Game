@@ -8,7 +8,7 @@
 //  2. 阶段管理（lobby → selection → playing → ended）
 //  3. 回合强制（仅当前回合方可行动）
 //  4. 消息验证与中继
-//  5. 心跳检测与断线清理
+//  5. 应用层心跳检测与断线重连
 // ═══════════════════════════════════════
 
 const WebSocket = require('ws');
@@ -28,6 +28,9 @@ console.log(`Naval Chess 联机服务器已启动，端口 ${PORT}`);
 // }
 const rooms = {};
 const DISCONNECT_GRACE = 60000; // 60秒断线宽限期，期内允许重连
+const HEARTBEAT_INTERVAL = 10000; // 每10秒检查一次心跳
+const HEARTBEAT_WARN = 25000;    // 25秒无消息 → 发送 ping_check
+const HEARTBEAT_DEAD = 40000;    // 40秒无消息 → 断开
 
 // WebSocket → { room, playerIndex }
 const playerMap = new Map();
@@ -95,14 +98,13 @@ server.on('connection', (ws) => {
   let playerInfo = null; // { room, playerIndex }
   let msgCount = 0;
 
-  // 心跳（容忍3次丢失，移动网络波动不轻易断连）
-  ws.isAlive = true;
-  ws.missedPings = 0;
-  ws.on('pong', () => { ws.isAlive = true; ws.missedPings = 0; });
+  // 应用层心跳：记录最后一次收到消息的时间
+  ws.lastMessageTime = Date.now();
 
   ws.on('message', (raw) => {
-    // 任何应用层消息都证明连接活跃，重置心跳计数
-    ws.missedPings = 0;
+    // 任何应用层消息都证明连接活跃
+    ws.lastMessageTime = Date.now();
+
     let msg;
     try { msg = JSON.parse(raw); } catch (e) {
       console.log('>>> 收到无效 JSON:', String(raw).slice(0, 80));
@@ -161,7 +163,6 @@ server.on('connection', (ws) => {
           send(ws, { type: 'error', message: '当前不在选船阶段' });
           return;
         }
-        // 中继给对手
         broadcastToRoom(playerInfo.room, msg, ws);
         break;
       }
@@ -179,7 +180,6 @@ server.on('connection', (ws) => {
           send(ws, { type: 'error', message: '仅房主可开始游戏' });
           return;
         }
-        // 进入游戏阶段，红方（玩家0）先手
         room.phase = 'playing';
         room.currentTurn = 0;
         room.turnNumber = 1;
@@ -257,14 +257,12 @@ server.on('connection', (ws) => {
           return;
         }
 
-        // 切换回合
         const prevTurn = room.currentTurn;
         room.currentTurn = 1 - room.currentTurn;
         if (room.currentTurn === 0) room.turnNumber++;
 
         console.log(`[${playerInfo.room}] ✅ 回合切换: P${prevTurn} → P${room.currentTurn} (第 ${room.turnNumber} 回合), 正在广播 turnSwitched…`);
 
-        // 广播回合切换给双方（双方都执行 switchToNextPlayer）
         const turnMsg = {
           type: 'turnSwitched',
           newTurn: room.currentTurn,
@@ -297,9 +295,25 @@ server.on('connection', (ws) => {
         break;
       }
 
-      // ── 心跳 ──
+      // ── 心跳（应用层） ──
       case 'ping': {
         send(ws, { type: 'pong' });
+        break;
+      }
+
+      case 'pong_check': {
+        // 客户端对 ping_check 的响应，lastMessageTime 已在 on('message') 中更新
+        break;
+      }
+
+      // ── 状态同步中继（断线重连后同步游戏状态） ──
+      case 'requestStateSync':
+      case 'stateSync': {
+        if (!playerInfo) return;
+        const room = rooms[playerInfo.room];
+        if (!room) return;
+        // 直接中继给对手
+        broadcastToRoom(playerInfo.room, msg, ws);
         break;
       }
 
@@ -331,10 +345,10 @@ server.on('connection', (ws) => {
         }
         console.log(`[${code}] 玩家 ${rejoinIdx} 重连成功`);
         send(ws, { type: 'rejoined', room: code, playerIndex: rejoinIdx });
-        // 通知对手
-        const otherIdx2 = 1 - rejoinIdx;
-        const other2 = room.players[otherIdx2];
-        send(other2, { type: 'opponentRejoined' });
+        // 通知对手：对手已重连
+        const otherIdx = 1 - rejoinIdx;
+        const other = room.players[otherIdx];
+        send(other, { type: 'opponentRejoined' });
         break;
       }
 
@@ -347,14 +361,16 @@ server.on('connection', (ws) => {
     }
   });
 
-  // ── 断线处理（60秒宽限期，期内允许重连） ──
+  // ── 断线处理（60秒宽限期，期内允许 rejoin） ──
   ws.on('close', () => {
     console.log('>>> 客户端断开连接');
     if (!playerInfo) return;
-    const room = rooms[playerInfo.room];
+
+    const roomCode = playerInfo.room;
+    const myIdx = playerInfo.playerIndex;
+    const room = rooms[roomCode];
     if (!room) return;
 
-    const myIdx = playerInfo.playerIndex;
     const otherIdx = 1 - myIdx;
     const other = room.players[otherIdx];
 
@@ -364,12 +380,16 @@ server.on('connection', (ws) => {
     if (room.disconnectTimers[myIdx]) clearTimeout(room.disconnectTimers[myIdx]);
 
     // 设置宽限期倒计时，期内允许 rejoin
+    // 注意：捕获 roomCode 和 myIdx 而不是 playerInfo，因为 playerInfo 可能被重连覆盖
     room.disconnectTimers[myIdx] = setTimeout(() => {
-      console.log(`[${playerInfo.room}] 玩家 ${myIdx} 断线宽限期到期，清理房间`);
-      if (room.phase === 'playing') {
-        send(other, { type: 'opponentDisconnected' });
+      console.log(`[${roomCode}] 玩家 ${myIdx} 断线宽限期到期，清理房间`);
+      const currentRoom = rooms[roomCode];
+      if (!currentRoom) return; // 房间已被清理
+      if (currentRoom.phase === 'playing') {
+        const otherPlayer = currentRoom.players[1 - myIdx];
+        send(otherPlayer, { type: 'opponentDisconnected' });
       }
-      cleanupRoom(playerInfo.room, '玩家断开连接超时');
+      cleanupRoom(roomCode, '玩家断开连接超时');
     }, DISCONNECT_GRACE);
 
     // 通知对手：对方暂时断线（非永久）
@@ -387,23 +407,30 @@ server.on('connection', (ws) => {
   });
 });
 
-// ── 心跳检测（每12秒，容忍5次丢失=60秒） ──
+// ── 应用层心跳检测（每10秒） ──
+// 使用应用层消息时间戳判断活跃度，避免协议级 ping/pong 被代理/负载均衡器干扰
 const heartbeat = setInterval(() => {
+  const now = Date.now();
   server.clients.forEach((ws) => {
-    if (ws.isAlive === false) {
-      ws.missedPings = (ws.missedPings || 0) + 1;
-      if (ws.missedPings >= 5) {
-        console.log('客户端心跳超时（连续5次无响应），断开连接');
-        return ws.terminate();
-      }
-      // 未达到3次，继续尝试 ping
-    } else {
-      ws.missedPings = 0;
+    if (!ws.lastMessageTime) {
+      ws.lastMessageTime = now;
+      return;
     }
-    ws.isAlive = false;
-    ws.ping();
+    const idle = now - ws.lastMessageTime;
+
+    if (idle >= HEARTBEAT_DEAD) {
+      // 40秒无任何消息，判定死亡
+      console.log('客户端心跳超时（' + Math.round(idle / 1000) + '秒无消息），断开连接');
+      ws.terminate();
+      return;
+    }
+
+    if (idle >= HEARTBEAT_WARN) {
+      // 25秒无消息，发送应用层 ping 探测
+      send(ws, { type: 'ping_check' });
+    }
   });
-}, 12000);
+}, HEARTBEAT_INTERVAL);
 
 server.on('close', () => clearInterval(heartbeat));
 
