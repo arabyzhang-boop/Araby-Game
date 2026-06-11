@@ -74,12 +74,12 @@ function clearBrokenBoarding() {
         if (target) {
           target.boardingTargets = target.boardingTargets.filter(function(idx) { return idx !== i; });
           if (target.boardingTargets.length === 0) {
-            log(`${shipName(targetIdx)} 因碰撞脱离接触，接舷战结束`);
+            log(shipName(targetIdx) + ' 因碰撞脱离接触，接舷战结束', shipFaction(targetIdx));
           }
         }
         ship.boardingTargets.splice(ti, 1);
         if (ship.boardingTargets.length === 0) {
-          log(`${shipName(i)} 因碰撞脱离接触，接舷战结束，恢复行动力`);
+          log(shipName(i) + ' 因碰撞脱离接触，接舷战结束，恢复行动力', shipFaction(i));
           ship.actionsRemaining = ship.maxActions;
         }
       }
@@ -92,6 +92,7 @@ function removeShip(shipIndex) {
   const ship = ships[shipIndex];
 
   // 殉爆：被击沉时对周围3×3区域所有船只造成1点伤害
+  var deathBlastSunk = {}; // 记录已被殉爆击沉的船，避免 while 循环重复播报
   if (ship.skillData && ship.skillData.deathBlast) {
     var blastCells = getShipCells(ship);
     var blastedShips = {};
@@ -112,10 +113,16 @@ function removeShip(shipIndex) {
       var blastTarget = ships[biIdx];
       blastTarget.hp--;
       addHitEffect(blastTarget.col, blastTarget.row, '💥');
-      log(`${shipName(biIdx)} 受到殉爆伤害（剩余 ${blastTarget.hp} HP）`);
+      log(shipName(biIdx) + ' 受到殉爆伤害（剩余 ' + blastTarget.hp + ' HP）', shipFaction(biIdx));
       if (blastTarget.hp <= 0) {
-        logSink(biIdx, shipIndex, '殉爆击沉');
+        deathBlastSunk[biIdx] = true;
       }
+    }
+    // 播报殉爆击沉（先报伤害，后报击沉）
+    var dbSunkIndices = Object.keys(deathBlastSunk);
+    for (var dk = 0; dk < dbSunkIndices.length; dk++) {
+      var dkIdx = parseInt(dbSunkIndices[dk]);
+      logSink(dkIdx, shipIndex, '殉爆击沉');
     }
   }
 
@@ -133,7 +140,7 @@ function removeShip(shipIndex) {
     if (target) {
       target.boardingTargets = target.boardingTargets.filter(function(idx) { return idx !== shipIndex; });
       if (target.boardingTargets.length === 0) {
-        log(`${shipName(targetIdx)} 接舷战结束，恢复自由，行动力重置`);
+        log(shipName(targetIdx) + " 接舷战结束，恢复自由，行动力重置", shipFaction(targetIdx));
         target.actionsRemaining = target.maxActions;
       }
     }
@@ -153,12 +160,19 @@ function removeShip(shipIndex) {
   else if (selectedShipIndex > shipIndex) selectedShipIndex--;
 
   // 清理因殉爆等连锁效应导致 HP ≤ 0 的僵尸船
+  var cascadedSunk = {}; // 追踪已在连锁中处理过的船
+  for (var dk2 = 0; dk2 < dbSunkIndices.length; dk2++) {
+    cascadedSunk[parseInt(dbSunkIndices[dk2])] = true;
+  }
   var found = true;
   while (found && !gameOver) {
     found = false;
     for (var di = ships.length - 1; di >= 0; di--) {
       if (ships[di].hp <= 0) {
-        log(shipName(di) + ' 因连锁效应被击沉（HP归零）');
+        if (!cascadedSunk[di]) {
+          logSink(di, shipIndex, '殉爆波及击沉');
+          cascadedSunk[di] = true;
+        }
         removeShip(di);
         found = true;
         break;
@@ -267,7 +281,7 @@ function checkVictory() {
       document.getElementById('btnReset').disabled = true;
       updateInfoPanel();
       render();
-      log(`—— ${pNames[winner]} 获得胜利！ ——`);
+      log("—— " + pNames[winner] + " 获得胜利！ ——");
       if (inCampaign && winner === 0) { completeCurrentLevel(getStarRating(winner)); }
       return;
     }
@@ -288,11 +302,11 @@ function processBoardingDamage() {
       if (enemy.braveActive) {
         enemy.braveActive = false;
         addHitEffect(enemy.col, enemy.row, '🛡️');
-        log(`无畏号的英勇技能免疫了第一次接舷伤害！`);
+        log("无畏号的英勇技能免疫了第一次接舷伤害！", shipFaction(targetIdx));
         continue;
       }
       enemy.hp--;
-      log(`接舷战：${shipName(i)} 对 ${shipName(targetIdx)} 造成 1 点伤害（剩余 ${enemy.hp} HP）`);
+      log("接舷战：" + shipName(i) + " 对 " + shipName(targetIdx) + " 造成 1 点伤害（剩余 " + enemy.hp + " HP）", shipFaction(targetIdx));
       if (enemy.hp <= 0 && defeatedObjs.indexOf(enemy) < 0) {
         defeatedObjs.push(enemy);
       }
@@ -339,9 +353,9 @@ function moveSharks() {
       }
       ships[hitIdx].hp--;
       addHitEffect(shark.col, shark.row, '☣️');
-      log(`鲨鱼撞击${shipName(hitIdx)}，造成 1 点伤害（剩余 ${ships[hitIdx].hp} HP）`);
+      log("鲨鱼撞击" + shipName(hitIdx) + "，造成 1 点伤害（剩余 " + ships[hitIdx].hp + " HP）", shipFaction(hitIdx));
       if (ships[hitIdx].hp <= 0) {
-        log(shipName(hitIdx) + ' 被 鲨鱼 鲨鱼击沉');
+        log(shipName(hitIdx) + " 被鲨鱼击沉", shipFaction(hitIdx));
         playerKills[ships[hitIdx].playerIndex === 0 ? 1 : 0].ram++;
         removeShip(hitIdx);
         checkVictory();
@@ -363,7 +377,7 @@ function checkSharkCollision(cells, ship) {
       if (sharks[si].col === cells[ci].col && sharks[si].row === cells[ci].row) {
         ship.hp--;
         addHitEffect(sharks[si].col, sharks[si].row, '☣️');
-        log(shipName(shipIdx) + ' 移动时撞上鲨鱼，受到 1 点伤害（剩余 ' + ship.hp + ' HP）');
+        log(shipName(shipIdx) + " 移动时撞上鲨鱼，受到 1 点伤害（剩余 " + ship.hp + " HP）", shipFaction(shipIdx));
         sharks.splice(si, 1);
         if (ship.hp <= 0) {
           logSink(shipIdx, shipIdx, '鲨鱼撞击');
@@ -387,7 +401,7 @@ function checkMineCollision(cells, ship) {
       if (mines[mi].col === cells[ci].col && mines[mi].row === cells[ci].row) {
         ship.hp--;
         addHitEffect(mines[mi].col, mines[mi].row, '💥');
-        log(`${shipName(shipIdx)} 触发了水雷，受到 1 点伤害（剩余 ${ship.hp} HP）`);
+        log(shipName(shipIdx) + " 触发了水雷，受到 1 点伤害（剩余 " + ship.hp + " HP）", shipFaction(shipIdx));
         mines.splice(mi, 1);
         if (ship.hp <= 0) {
           logSink(shipIdx, shipIdx, '水雷');
@@ -415,7 +429,7 @@ function switchToNextPlayer() {
     if (gs.playerIndex === currentPlayerIndex) {
       gs.grounded = isShipGrounded(gs);
       if (gs.grounded) {
-        log('⚠️ ' + shipName(gi) + ' 处于浅滩，下回合将搁浅！');
+        log("⚠️ " + shipName(gi) + " 处于浅滩，下回合将搁浅！", shipFaction(gi));
       }
     }
   }
@@ -455,11 +469,11 @@ function switchToNextPlayer() {
             var dmg = s.hp;
             s.hp -= dmg;
             var sIdx = ships.indexOf(s);
-            log(shipName(sIdx) + ' 下潜时间到，上浮碰撞，自身受到 ' + dmg + ' 点伤害（剩余 ' + s.hp + ' HP）');
+            log(shipName(sIdx) + " 下潜时间到，上浮碰撞，自身受到 " + dmg + " 点伤害（剩余 " + s.hp + " HP）", shipFaction(sIdx));
             for (var bi = 0; bi < blockedShips.length; bi++) {
               var blocker = ships[blockedShips[bi]];
               blocker.hp -= dmg;
-              log(shipName(blockedShips[bi]) + ' 受到上浮碰撞 ' + dmg + ' 点伤害（剩余 ' + blocker.hp + ' HP）');
+              log(shipName(blockedShips[bi]) + " 受到上浮碰撞 " + dmg + " 点伤害（剩余 " + blocker.hp + " HP）", shipFaction(blockedShips[bi]));
               if (blocker.hp <= 0) logSink(blockedShips[bi], sIdx, '同归于尽');
             }
             if (s.hp <= 0) logSink(sIdx, sIdx, '同归于尽');
@@ -474,7 +488,7 @@ function switchToNextPlayer() {
             }
             checkVictory();
           } else {
-            log(`飞翔荷兰人号下潜时间到，自动上浮`);
+            log("飞翔荷兰人号下潜时间到，自动上浮");
           }
         }
       }
@@ -495,7 +509,7 @@ function switchToNextPlayer() {
 
   var pNames = ['葡萄牙帝国', '荷兰东印度公司'];
   var who = (gameMode === 'ai' || inCampaign) && currentPlayerIndex === 1 ? '电脑' : '玩家' + (currentPlayerIndex + 1);
-  log(`—— 轮到${who}（${pNames[currentPlayerIndex]}）行动 ——`);
+  log("—— 轮到" + who + "（" + pNames[currentPlayerIndex] + "）行动 ——");
 }
 
 // ── 船头撞击辅助 ──
@@ -602,7 +616,7 @@ function pushShip(ship, shipIndex, dx, dy, maxSteps) {
   if (steps > 0) {
     ship.col += dx * steps;
     ship.row += dy * steps;
-    log(`${shipName(shipIndex)} 被击退 ${steps} 格`);
+    log(shipName(shipIndex) + " 被击退 " + steps + " 格", shipFaction(shipIndex));
   }
   return steps;
 }

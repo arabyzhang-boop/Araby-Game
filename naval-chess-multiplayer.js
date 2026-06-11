@@ -145,8 +145,8 @@ function mpConnect() {
     mpPingTimer = setInterval(function() {
       if (mpSocket && mpSocket._socketId === mySocketId && mpSocket.readyState === WebSocket.OPEN) {
         mpSocket.send(JSON.stringify({ type: 'ping' }));
-        // 客户端心跳检测：超过25秒没收到服务器任何回复 → 判定断线
-        if (Date.now() - mpLastPongTime > 25000) {
+        // 客户端心跳检测：超过15秒没收到服务器任何回复 → 判定断线
+        if (Date.now() - mpLastPongTime > 15000) {
           console.log('[MP] 心跳超时（' + Math.round((Date.now() - mpLastPongTime) / 1000) + '秒无回复），主动断开重连');
           try { mpSocket.close(); } catch(e) {}
         }
@@ -442,6 +442,8 @@ function mpRestoreGameState(state) {
   render();
   console.log('[联机] 游戏状态已从对手同步恢复');
   log('[联机] 游戏状态已同步，继续对战');
+  // 恢复连接后重试之前发送失败的动作
+  mpFlushFailedActions();
 }
 
 // ── 选船同步 ──
@@ -753,6 +755,26 @@ function sendAction(action) {
   if (mpSocket && mpSocket.readyState === WebSocket.OPEN) {
     action.playerIndex = currentPlayerIndex;
     mpSocket.send(JSON.stringify({ type: 'action', action: action }));
+    return true;
+  }
+  return false;
+}
+
+// 暂存发送失败的动作，等待连接恢复后重试
+function mpQueueFailedAction(action) {
+  mpFailedActionQueue.push(action);
+  log('[联机] 行动未送达，已暂存等待重试（队列 ' + mpFailedActionQueue.length + '）');
+}
+
+// 清空失败动作队列（重新发送）
+function mpFlushFailedActions() {
+  if (mpFailedActionQueue.length === 0) return;
+  if (!mpSocket || mpSocket.readyState !== WebSocket.OPEN) return;
+  log('[联机] 正在重发 ' + mpFailedActionQueue.length + ' 个暂存动作…');
+  var queued = mpFailedActionQueue.slice();
+  mpFailedActionQueue = [];
+  for (var i = 0; i < queued.length; i++) {
+    sendAction(queued[i]);
   }
 }
 
@@ -791,6 +813,7 @@ function mpWaitForTurnSwitch() {
 }
 
 var mpRemoteExec = false; // 远程执行中标志
+var mpFailedActionQueue = []; // 发送失败暂存的动作队列（重连后重试）
 
 // ── 状态校验哈希（调试用：双方回合切换后应输出相同值） ──
 function mpComputeStateHash() {
@@ -836,8 +859,9 @@ var MP_REMOTE_DISPATCH = {
 
 // ── 远程重放：布雷 ──
 function mpRemoteLayMine(action) {
-  var ship = ships[action.shipIdx];
-  if (!ship) return;
+  var idx = findShipById(action.shipId);
+  if (idx < 0) return;
+  var ship = ships[idx];
   mines.push({ col: action.mineCol, row: action.mineRow });
   ship.minesPlaced = action.minesPlaced;
   ship.actionsRemaining--;
@@ -846,9 +870,11 @@ function mpRemoteLayMine(action) {
 
 // ── 远程重放：补给 ──
 function mpRemoteSupply(action) {
-  var ship = ships[action.shipIdx];
-  var target = ships[action.targetIdx];
-  if (!ship || !target) return;
+  var shipIdx = findShipById(action.shipId);
+  var targetIdx = findShipById(action.targetId);
+  if (shipIdx < 0 || targetIdx < 0) return;
+  var ship = ships[shipIdx];
+  var target = ships[targetIdx];
   target.hp = Math.min(target.hp + 1, target.maxHp);
   ship.supplyUsed = action.supplyUsed;
   ship.actionsRemaining--;
@@ -858,9 +884,11 @@ function mpRemoteSupply(action) {
 
 // ── 远程重放：弹药支援 ──
 function mpRemoteAmmoSupport(action) {
-  var ship = ships[action.shipIdx];
-  var target = ships[action.targetIdx];
-  if (!ship || !target) return;
+  var shipIdx = findShipById(action.shipId);
+  var targetIdx = findShipById(action.targetId);
+  if (shipIdx < 0 || targetIdx < 0) return;
+  var ship = ships[shipIdx];
+  var target = ships[targetIdx];
   target.broadsideCount = Math.max(0, target.broadsideCount - 1);
   ship.broadsideCount = ship.maxBroadsideCount;
   ship.actionsRemaining--;
@@ -889,8 +917,8 @@ function applyRemoteAction(action) {
     return;
   }
 
-  if (action.shipIdx !== undefined) {
-    selectedShipIndex = action.shipIdx;
+  if (action.shipId !== undefined) {
+    selectedShipIndex = findShipById(action.shipId);
   }
   // 统一调度：查找远程处理器（新增行动只需在 MP_REMOTE_DISPATCH 加一行）
   var dispatchKey = action.type === 'skill' ? 'skill:' + action.skill : action.type;
@@ -954,6 +982,7 @@ function cleanupMultiplayer() {
   clearInterval(mpPingTimer);
   mpWaitingForTurnSwitch = false;
   mpReconnectAttempts = 0;
+  mpFailedActionQueue = [];
   if (mpSocket) { try { mpSocket.close(); } catch(e) {} mpSocket = null; }
   mpConnected = false;
   mpRoom = null; mpPlayerIndex = -1; mpGameStarted = false; mpIsHost = false;
@@ -1067,7 +1096,7 @@ document.addEventListener('visibilitychange', function() {
       mpPingTimer = setInterval(function() {
         if (mpSocket && mpSocket._socketId === visSid && mpSocket.readyState === WebSocket.OPEN) {
           mpSocket.send(JSON.stringify({ type: 'ping' }));
-          if (Date.now() - mpLastPongTime > 25000) {
+          if (Date.now() - mpLastPongTime > 15000) {
             console.log('[MP] 心跳超时，主动断开重连');
             try { mpSocket.close(); } catch(e) {}
           }

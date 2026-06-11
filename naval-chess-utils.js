@@ -4,14 +4,24 @@
 // ═══════════════════════════════════════
 
 // ── 日志 ──
-function log(msg) {
+// faction: 'red' | 'blue' | null（中立消息）
+function log(msg, faction) {
   var entry = document.createElement('div');
   entry.className = 'log-entry';
+  if (faction === 'red') entry.classList.add('log-red');
+  else if (faction === 'blue') entry.classList.add('log-blue');
   entry.textContent = '▸ ' + msg;
   elLogArea.prepend(entry);
   while (elLogArea.children.length > 50) {
     elLogArea.removeChild(elLogArea.lastChild);
   }
+}
+
+/** 获取舰船的势力颜色标识 */
+function shipFaction(idx) {
+  var s = ships[idx];
+  if (!s) return null;
+  return s.playerIndex === 0 ? 'red' : 'blue';
 }
 
 /** 返回舰船占据的所有格子坐标（{col, row} 数组） */
@@ -142,7 +152,7 @@ function processTerrainEffects(ship) {
       var vo = document.getElementById('victoryOverlay');
       vo.classList.remove('hidden'); vo.style.display = 'flex';
       btnEndTurn.disabled = true; btnReset.disabled = true;
-      log('🚩 ' + shipNameStr + ' 占据目标点，' + pNames[ship.playerIndex] + ' 获得胜利！');
+      log('🚩 ' + shipNameStr + ' 占据目标点，' + pNames[ship.playerIndex] + ' 获得胜利！', shipFaction(shipIdx));
       updateInfoPanel(); render();
       if (inCampaign && ship.playerIndex === 0) completeCurrentLevel(getStarRating(ship.playerIndex));
       return true;
@@ -151,7 +161,7 @@ function processTerrainEffects(ship) {
     if (t.type === TERRAIN.SUPPLY && ship.hp < ship.maxHp) {
       ship.hp++;
       addHitEffect(t.col, t.row, '❤️‍🩹');
-      log(shipNameStr + ' 占据补给点，回复1点生命（' + ship.hp + '/' + ship.maxHp + '）');
+      log(shipNameStr + ' 占据补给点，回复1点生命（' + ship.hp + '/' + ship.maxHp + '）', shipFaction(shipIdx));
       removeTerrainAt(t.col, t.row);
       render();
       break;
@@ -160,7 +170,7 @@ function processTerrainEffects(ship) {
     if (t.type === TERRAIN.POWDER_KEG && ship.broadsideCount > 0) {
       ship.broadsideCount--;
       addHitEffect(t.col, t.row, '💥');
-      log(shipNameStr + ' 获得火药桶，补充一次舷炮（剩余 ' + (ship.maxBroadsideCount - ship.broadsideCount) + ' 次）');
+      log(shipNameStr + ' 获得火药桶，补充一次舷炮（剩余 ' + (ship.maxBroadsideCount - ship.broadsideCount) + ' 次）', shipFaction(shipIdx));
       removeTerrainAt(t.col, t.row);
       render();
       break;
@@ -209,18 +219,31 @@ function shipName(idx) {
   return s.name || ('舰船 #' + (idx + 1));
 }
 
-// ── 击沉日志 ──
+// ── 击沉日志（按被击沉方着色） ──
 function logSink(victimIdx, killerIdx, method) {
+  var faction = shipFaction(victimIdx);
+  var msg;
   if (victimIdx === killerIdx) {
-    log(shipName(victimIdx) + ' ' + method + ' 自毁');
+    msg = shipName(victimIdx) + ' ' + method + ' 自毁';
   } else {
-    log(shipName(victimIdx) + ' 被 ' + shipName(killerIdx) + ' ' + method);
+    msg = shipName(victimIdx) + ' 被 ' + shipName(killerIdx) + ' ' + method;
   }
+  log(msg, faction);
 }
 
 // ── 获取舰船转向消耗 ──
 function getTurnCost(ship) {
   return ship.length;
+}
+
+var shipIdCounter = 0;
+
+// ── 通过 shipId 查找舰船索引 ──
+function findShipById(shipId) {
+  for (var i = 0; i < ships.length; i++) {
+    if (ships[i].shipId === shipId) return i;
+  }
+  return -1;
 }
 
 // ── 舰船对象工厂（统一初始化，避免多处重复） ──
@@ -229,6 +252,7 @@ function getTurnCost(ship) {
 function createShip(props) {
   var sd = props.skillData || null;
   var ship = {
+    shipId: ++shipIdCounter,
     col: props.col, row: props.row, length: props.length, direction: props.direction,
     playerIndex: props.playerIndex,
     hp: props.hp != null ? props.hp : props.length,

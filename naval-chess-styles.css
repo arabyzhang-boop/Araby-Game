@@ -356,6 +356,8 @@
     padding: 2px 0;
     border-bottom: 1px dotted rgba(139,90,40,0.15);
   }
+  .log-area .log-entry.log-red  { color: #c0392b; font-weight: 500; }
+  .log-area .log-entry.log-blue { color: #2471a3; font-weight: 500; }
 
   /* 滚动条风格 */
   .log-area::-webkit-scrollbar { width: 6px; }

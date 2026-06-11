@@ -29,8 +29,8 @@ console.log(`Naval Chess 联机服务器已启动，端口 ${PORT}`);
 const rooms = {};
 const DISCONNECT_GRACE = 60000; // 60秒断线宽限期，期内允许重连
 const HEARTBEAT_INTERVAL = 10000; // 每10秒检查一次心跳
-const HEARTBEAT_WARN = 25000;    // 25秒无消息 → 发送 ping_check
-const HEARTBEAT_DEAD = 40000;    // 40秒无消息 → 断开
+const HEARTBEAT_WARN = 15000;    // 15秒无消息 → 发送 ping_check
+const HEARTBEAT_DEAD = 30000;    // 30秒无消息 → 断开
 
 // WebSocket → { room, playerIndex }
 const playerMap = new Map();

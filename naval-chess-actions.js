@@ -9,7 +9,7 @@ function afterShipAction(ship, actionDesc, cost) {
 
   ship.actionsRemaining -= cost;
   if (!isShipInFog(ship)) {
-    log(`${actionDesc}（消耗 ${cost}），剩余行动 ${ship.actionsRemaining}`);
+    log(actionDesc + '（消耗 ' + cost + '），剩余行动 ' + ship.actionsRemaining, shipFaction(ships.indexOf(ship)));
   }
 
   // 交互地形效果（目标点/补给点/火药桶）
@@ -18,8 +18,11 @@ function afterShipAction(ship, actionDesc, cost) {
   // 多人联机：仅本地行动才发送到对手（远程执行不重复发送）
   if (mpGameStarted && !mpRemoteExec) {
     if (mpPendingAction) {
-      mpPendingAction.shipIdx = ships.indexOf(ship);
-      sendAction(mpPendingAction);
+      mpPendingAction.shipId = ship.shipId;
+      if (!sendAction(mpPendingAction)) {
+        // 发送失败（socket 未就绪），暂存待重试
+        mpQueueFailedAction(mpPendingAction);
+      }
       mpPendingAction = null;
     } else {
       console.warn('[联机] 行动未设置 mpPendingAction，将不同步到对手！调用栈:', new Error().stack);
@@ -33,7 +36,7 @@ function afterShipAction(ship, actionDesc, cost) {
     ship.grounded = isShipGrounded(ship);
     if (!mpRemoteExec) {
       selectedShipIndex = -1;
-      log(`舰船行动力耗尽，已取消选中`);
+      log("舰船行动力耗尽，已取消选中");
     }
   }
 
@@ -249,27 +252,27 @@ function fireBroadside() {
 
   // 铁甲：一轮舷炮自伤至多1点（多枚视作一次），伤害-1（可减至0）
   if (ship.skillData && ship.skillData.ironArmor) selfDamage = Math.min(selfDamage, 1);
+  var selfActualDmg = 0;
+  var selfIronBlocked = false;
   if (selfDamage > 0) {
-    var actualDmg = selfDamage;
+    selfActualDmg = selfDamage;
     if (ship.skillData && ship.skillData.ironArmor) {
-      actualDmg = selfDamage - 1;
-      if (selfDamage > actualDmg) addHitEffect(ship.col, ship.row, '🛡️');
+      selfActualDmg = selfDamage - 1;
+      if (selfDamage > selfActualDmg) { addHitEffect(ship.col, ship.row, '🛡️'); selfIronBlocked = true; }
     }
-    if (actualDmg > 0) {
-      ship.hp -= actualDmg;
-      log(`舷炮贴脸开火！${shipName(selectedShipIndex)} 有 ${selfDamage} 格与敌舰贴身，自身受到 ${actualDmg} 点反冲伤害（剩余 ${ship.hp} HP）`);
+    if (selfActualDmg > 0) {
+      ship.hp -= selfActualDmg;
     } else {
-      log(`舷炮贴脸开火！${shipName(selectedShipIndex)} 的铁甲完全抵御了反冲伤害`);
+      selfIronBlocked = true;
     }
   }
 
-  // 铁甲：每轮舷炮中命中船舷的多枚视作1次，总伤害-1（至少1点）；命中船头/船尾不触发减伤
+  // 先计算伤害，暂不播报
   var ironArmorHits = {};
-  for (const hit of hits) {
+  for (var hi = 0; hi < hits.length; hi++) {
+    var hit = hits[hi];
     ships[hit.shipIdx].hp--;
     addHitEffect(hit.col, hit.row);
-    const tag = hit.isFriendly ? '友军' : '敌军';
-    log(`炮弹命中${tag}${shipName(hit.shipIdx)}，造成 1 点伤害（剩余 ${ships[hit.shipIdx].hp} HP）`);
     if (ships[hit.shipIdx].skillData && ships[hit.shipIdx].skillData.ironArmor && hit.hitsBroadside) {
       ironArmorHits[hit.shipIdx] = (ironArmorHits[hit.shipIdx] || 0) + 1;
     }
@@ -277,39 +280,69 @@ function fireBroadside() {
   var iaKeys = Object.keys(ironArmorHits);
   for (var iak = 0; iak < iaKeys.length; iak++) {
     var iaIdx = parseInt(iaKeys[iak]);
-    var actualDmg = ironArmorHits[iaIdx] - 1; // 铁甲：伤害-1（可减至0）
-    if (actualDmg < 0) actualDmg = 0;
-    ships[iaIdx].hp += (ironArmorHits[iaIdx] - actualDmg);
-    if (ironArmorHits[iaIdx] > actualDmg) addHitEffect(ships[iaIdx].col, ships[iaIdx].row, '🛡️');
-    if (actualDmg > 0) {
-      log(`${shipName(iaIdx)} 的铁甲减免了 ${ironArmorHits[iaIdx] - actualDmg} 点舷炮伤害（剩余 ${ships[iaIdx].hp} HP）`);
-    } else {
-      log(`${shipName(iaIdx)} 的铁甲完全抵御了舷炮伤害`);
-    }
+    var iaDmg = ironArmorHits[iaIdx] - 1;
+    if (iaDmg < 0) iaDmg = 0;
+    ships[iaIdx].hp += (ironArmorHits[iaIdx] - iaDmg);
+    if (ironArmorHits[iaIdx] > iaDmg) addHitEffect(ships[iaIdx].col, ships[iaIdx].row, '🛡️');
   }
 
-  // 收集被击沉的船只对象（用对象引用而非索引，避免连锁移除导致索引错位）
+  // 收集被击沉的船只对象
   var defeatedSet = {};
-  for (const hit of hits) {
-    if (ships[hit.shipIdx].hp <= 0) defeatedSet[hit.shipIdx] = ships[hit.shipIdx];
+  for (var hi2 = 0; hi2 < hits.length; hi2++) {
+    var h2 = hits[hi2];
+    if (ships[h2.shipIdx].hp <= 0) defeatedSet[h2.shipIdx] = ships[h2.shipIdx];
   }
   if (ship.hp <= 0) defeatedSet[selectedShipIndex] = ship;
 
-  let broadsideKills = 0;
-  for (const hit of hits) {
-    if (!hit.isFriendly && ships[hit.shipIdx] && ships[hit.shipIdx].hp <= 0) {
+  var broadsideKills = 0;
+  for (var hi3 = 0; hi3 < hits.length; hi3++) {
+    var h3 = hits[hi3];
+    if (!h3.isFriendly && ships[h3.shipIdx] && ships[h3.shipIdx].hp <= 0) {
       broadsideKills++;
     }
   }
   playerKills[ship.playerIndex].broadside += broadsideKills;
 
-  const friendlyHits = hits.filter(function(h) { return h.isFriendly; }).length;
-  const enemyHits = hits.filter(function(h) { return !h.isFriendly; }).length;
-  const summary = [enemyHits > 0 ? `${enemyHits} 发命中敌军` : '', friendlyHits > 0 ? `${friendlyHits} 发误伤友军` : ''].filter(Boolean).join('，');
+  var friendlyHits = 0, enemyHits = 0;
+  for (var hc = 0; hc < hits.length; hc++) {
+    if (hits[hc].isFriendly) friendlyHits++; else enemyHits++;
+  }
+  var summary = [enemyHits > 0 ? enemyHits + ' 发命中敌军' : '', friendlyHits > 0 ? friendlyHits + ' 发误伤友军' : ''].filter(Boolean).join('，');
   ship.broadsideCount++;
   mpPendingAction = { type: 'broadside' };
-  afterShipAction(ship, `${shipName(selectedShipIndex)} 舷炮齐射（${summary || '未命中任何目标'}）`, 1);
 
+  // ① 先播报开火方行动
+  afterShipAction(ship, shipName(selectedShipIndex) + ' 舷炮齐射（' + (summary || '未命中任何目标') + '）', 1);
+  if (gameOver) return true;
+
+  // ② 再播报开火方自伤
+  if (selfDamage > 0) {
+    if (selfActualDmg > 0) {
+      log(shipName(selectedShipIndex) + ' 贴脸开火，自身受到 ' + selfActualDmg + ' 点反冲伤害（剩余 ' + ship.hp + ' HP）', shipFaction(selectedShipIndex));
+    } else if (selfIronBlocked) {
+      log(shipName(selectedShipIndex) + ' 的铁甲完全抵御了反冲伤害', shipFaction(selectedShipIndex));
+    }
+  }
+
+  // ③ 最后播报被击中方受伤/铁甲减免
+  for (var hl = 0; hl < hits.length; hl++) {
+    var hlHit = hits[hl];
+    var hlIdx = hlHit.shipIdx;
+    var tag = hlHit.isFriendly ? '友军' : '敌军';
+    log('炮弹命中' + tag + shipName(hlIdx) + '，造成 1 点伤害（剩余 ' + ships[hlIdx].hp + ' HP）', shipFaction(hlIdx));
+  }
+  for (var ikk = 0; ikk < iaKeys.length; ikk++) {
+    var ikIdx = parseInt(iaKeys[ikk]);
+    var ikDmg = ironArmorHits[ikIdx] - 1;
+    if (ikDmg < 0) ikDmg = 0;
+    if (ikDmg > 0) {
+      log(shipName(ikIdx) + ' 的铁甲减免了 ' + (ironArmorHits[ikIdx] - ikDmg) + ' 点舷炮伤害（剩余 ' + ships[ikIdx].hp + ' HP）', shipFaction(ikIdx));
+    } else {
+      log(shipName(ikIdx) + ' 的铁甲完全抵御了舷炮伤害', shipFaction(ikIdx));
+    }
+  }
+
+  // ④ 击沉播报（按被击沉方着色）
   var deadShips = Object.keys(defeatedSet).map(function(k) { return defeatedSet[k]; });
   for (var di = 0; di < deadShips.length; di++) {
     var curIdx = ships.indexOf(deadShips[di]);
@@ -361,11 +394,11 @@ function initiateRamming() {
   if (contactType === 'side') {
     atkDmg = 1;
     defDmg = dmg;
-    log(`冲锋撞击敌方船舷！自身受到 ${atkDmg} 点反冲伤害，敌方受到 ${defDmg} 点伤害`);
+    log(shipName(selectedShipIndex) + " 冲锋撞击敌方船舷！自身受到 " + atkDmg + " 点反冲伤害，" + shipName(target.enemyIdx) + " 受到 " + defDmg + " 点伤害", shipFaction(selectedShipIndex));
   } else {
     atkDmg = dmg;
     defDmg = Math.min(dmg, ship.length);
-    log(`冲锋船头/船尾对撞！己方受到 ${atkDmg} 点伤害，敌方受到 ${defDmg} 点伤害${dmg > ship.length ? '（敌方伤害已达撞击船体积上限）' : ''}`);
+    log(shipName(selectedShipIndex) + " 冲锋船头/船尾对撞！己方受到 " + atkDmg + " 点伤害，" + shipName(target.enemyIdx) + " 受到 " + defDmg + " 点伤害" + (dmg > ship.length ? "（敌方伤害已达撞击船体积上限）" : ""), shipFaction(selectedShipIndex));
   }
 
   // 铁甲：仅船舷受撞击时伤害-1（可减至0）
@@ -385,10 +418,10 @@ function initiateRamming() {
   const knockback = Math.max(1, Math.floor(ship.length * dmg / enemy.length));
   const pushed = pushShip(enemy, target.enemyIdx, dv.dx, dv.dy, knockback);
   if (pushed > 0) {
-    log(`${shipName(target.enemyIdx)} 被击退 ${pushed} 格`);
+    log(shipName(target.enemyIdx) + ' 被击退 ' + pushed + ' 格', shipFaction(target.enemyIdx));
     clearBrokenBoarding();
   } else {
-    log(`敌方舰船被地形或舰船阻挡，无法击退`);
+    log(shipName(target.enemyIdx) + " 被地形或舰船阻挡，无法击退", shipFaction(target.enemyIdx));
   }
 
   var defeatedObjs = [];
@@ -498,11 +531,11 @@ function surfaceShip() {
   if (blockedShips.length > 0) {
     var dmg = ship.hp;
     ship.hp -= dmg;
-    log(`飞翔荷兰人号上浮时与其他船只碰撞，自身受到 ${dmg} 点伤害（剩余 ${ship.hp} HP）`);
+    log("飞翔荷兰人号上浮时与其他船只碰撞，自身受到 " + dmg + " 点伤害（剩余 " + ship.hp + " HP）", shipFaction(shipIdx));
     for (var bi = 0; bi < blockedShips.length; bi++) {
       var blocker = ships[blockedShips[bi]];
       blocker.hp -= dmg;
-      log(`碰撞对 ${shipName(blockedShips[bi])} 造成 ${dmg} 点伤害（剩余 ${blocker.hp} HP）`);
+      log("碰撞对 " + shipName(blockedShips[bi]) + " 造成 " + dmg + " 点伤害（剩余 " + blocker.hp + " HP）", shipFaction(blockedShips[bi]));
       if (blocker.hp <= 0) {
         logSink(blockedShips[bi], selectedShipIndex, '同归于尽');
       }
@@ -520,7 +553,7 @@ function surfaceShip() {
     }
     checkVictory();
   } else {
-    log(`飞翔荷兰人号安全上浮`);
+    log("飞翔荷兰人号安全上浮", shipFaction(shipIdx));
   }
 
   // shipIdx may have changed after removeShip — only call if ship still alive
@@ -559,7 +592,7 @@ function fireBowCannon() {
   }
   if (selfDamage > 0) {
     ship.hp -= selfDamage;
-    log(`三联炮贴脸开火！${shipName(selectedShipIndex)} 船头与舰船接触，自身受到 ${selfDamage} 点反冲伤害（剩余 ${ship.hp} HP）`);
+    log(shipName(selectedShipIndex) + " 三联炮贴脸开火！船头与舰船接触，自身受到 " + selfDamage + " 点反冲伤害（剩余 " + ship.hp + " HP）", shipFaction(selectedShipIndex));
   }
 
   // 沿船头方向搜索，射程3
@@ -580,7 +613,7 @@ function fireBowCannon() {
       hitShip.hp--;
       addHitEffect(tc, tr);
       var tag = hitShip.playerIndex === ship.playerIndex ? '友军' : '敌军';
-      log(`三联炮弹命中${tag}${shipName(hitIdx)}，造成 1 点伤害（剩余 ${hitShip.hp} HP）`);
+      log("三联炮弹命中" + tag + shipName(hitIdx) + "，造成 1 点伤害（剩余 " + hitShip.hp + " HP）", shipFaction(hitIdx));
       break;
     }
   }
@@ -635,11 +668,11 @@ function fireGreekFire() {
     if (hitIdx >= 0 && hitIdx !== selectedShipIndex && ships[hitIdx].playerIndex !== ship.playerIndex) {
       ships[hitIdx].hp--;
       addHitEffect(tc, tr, '🔥');
-      log(`希腊火焰命中敌方${shipName(hitIdx)}，造成 1 点伤害（剩余 ${ships[hitIdx].hp} HP）`);
+      log("希腊火焰命中敌方" + shipName(hitIdx) + "，造成 1 点伤害（剩余 " + ships[hitIdx].hp + " HP）", shipFaction(hitIdx));
       break;
     }
     if (hitIdx >= 0) {
-      log(`希腊火焰被友军${shipName(hitIdx)} 阻挡`);
+      log("希腊火焰被友军" + shipName(hitIdx) + " 阻挡", shipFaction(selectedShipIndex));
       break;
     }
   }
@@ -721,7 +754,7 @@ function checkDevourContacts() {
     var s = ships[i];
     if (s.devourTarget >= 0) {
       if (!areDevourBowContact(i, s.devourTarget)) {
-        log(`吞噬被打断！沉默玛丽号与目标脱离接触，进度归零`);
+        log("吞噬被打断！沉默玛丽号与目标脱离接触，进度归零", shipFaction(i));
         s.devourTarget = -1;
         s.devourProgress = 0;
       }
@@ -772,7 +805,7 @@ function supplyShip() {
 
   target.hp++;
   ship.supplyUsed++;
-  mpPendingAction = { type: 'skill', skill: 'supply', targetIdx: targetIdx, supplyUsed: ship.supplyUsed };
+  mpPendingAction = { type: 'skill', skill: 'supply', targetId: target.shipId, supplyUsed: ship.supplyUsed };
   addHitEffect(target.col, target.row, '❤️‍🩹');
   afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 回复1点生命（剩余 ${target.hp} HP）`, 1);
   return true;
@@ -795,7 +828,7 @@ function ammoSupport() {
 
   target.broadsideCount--;
   ship.broadsideCount = ship.maxBroadsideCount;
-  mpPendingAction = { type: 'skill', skill: 'ammoSupport', targetIdx: targetIdx };
+  mpPendingAction = { type: 'skill', skill: 'ammoSupport', targetId: target.shipId };
   addHitEffect(target.col, target.row, '🔧');
   afterShipAction(ship, `乌尔卡号为 ${shipName(targetIdx)} 补充了一次舷炮`, 1);
   return true;
